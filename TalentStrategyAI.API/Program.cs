@@ -11,7 +11,7 @@ builder.Services.AddSwaggerGen();
 
 // Add Entity Framework Core with SQLite
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Add CORS policy (allowing any origin for development)
 builder.Services.AddCors(options =>
