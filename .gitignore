@@ -341,3 +341,5 @@ FodyWeavers.xsd
 *.db-shm
 *.db-wal
 
+# Uploaded files
+**/Uploads/

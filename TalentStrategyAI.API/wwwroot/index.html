@@ -14,8 +14,29 @@
         </header>
         <main>
             <section id="app-content">
-                <h2>Welcome to TalentStrategyAI</h2>
-                <p>Frontend application will be developed here.</p>
+                <h2>Resume Upload</h2>
+                <form id="resume-upload-form" class="upload-form">
+                    <div class="form-group">
+                        <label for="resume-file">Select Resume File</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="resume-file" name="resume" accept=".pdf,.doc,.docx" required>
+                            <span class="file-input-label">Choose file...</span>
+                        </div>
+                        <small class="file-info">Accepted formats: PDF, DOC, DOCX (Max 10MB)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="candidate-name">Candidate Name</label>
+                        <input type="text" id="candidate-name" name="candidateName" placeholder="Enter candidate name" required>
+                    </div>
+                    
+                    <button type="submit" class="submit-btn" id="submit-btn">
+                        <span class="btn-text">Upload Resume</span>
+                        <span class="btn-loader" style="display: none;">Uploading...</span>
+                    </button>
+                </form>
+                
+                <div id="upload-message" class="message" style="display: none;"></div>
             </section>
         </main>
     </div>
