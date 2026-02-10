@@ -3,44 +3,139 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TalentStrategyAI</title>
+    <title>TalentStrategyAI | EY Talent Match</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
 </head>
-<body>
-    <div class="container">
-        <header>
-            <h1>TalentStrategyAI</h1>
-            <p>AI-Powered Talent Strategy Platform</p>
-        </header>
-        <main>
-            <section id="app-content">
-                <h2>Resume Upload</h2>
-                <form id="resume-upload-form" class="upload-form">
-                    <div class="form-group">
-                        <label for="resume-file">Select Resume File</label>
-                        <div class="file-input-wrapper">
-                            <input type="file" id="resume-file" name="resume" accept=".pdf,.doc,.docx" required>
-                            <span class="file-input-label">Choose file...</span>
-                        </div>
-                        <small class="file-info">Accepted formats: PDF, DOC, DOCX (Max 10MB)</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="candidate-name">Candidate Name</label>
-                        <input type="text" id="candidate-name" name="candidateName" placeholder="Enter candidate name" required>
-                    </div>
-                    
-                    <button type="submit" class="submit-btn" id="submit-btn">
-                        <span class="btn-text">Upload Resume</span>
-                        <span class="btn-loader" style="display: none;">Uploading...</span>
-                    </button>
-                </form>
-                
-                <div id="upload-message" class="message" style="display: none;"></div>
-            </section>
-        </main>
+<body class="page--landing">
+    <!-- EY logo: top right on landing only -->
+    <div class="ey-logo-top" aria-hidden="true">
+        <img src="images/ey-logo.svg" alt="EY" class="ey-logo-img">
     </div>
+
+    <!-- Landing page -->
+    <section class="page page--landing" id="page-landing">
+        <header class="landing-header">
+            <h1 class="landing-title">TalentStrategyAI</h1>
+            <p class="landing-tagline">EY Talent Match — match talent to roles, fairly and clearly.</p>
+            <button type="button" class="btn-login btn-login--landing" id="btn-login" aria-label="Login">Login</button>
+        </header>
+        <div class="landing-choices">
+            <p class="landing-prompt">I am...</p>
+            <div class="landing-buttons">
+                <button type="button" class="landing-card" id="go-employee" data-role="employee">
+                    <span class="landing-card__icon" aria-hidden="true">👤</span>
+                    <span class="landing-card__title">Employee</span>
+                    <span class="landing-card__desc">Upload my resume, see my match to roles, get upskilling suggestions.</span>
+                </button>
+                <button type="button" class="landing-card" id="go-manager" data-role="manager">
+                    <span class="landing-card__icon" aria-hidden="true">👥</span>
+                    <span class="landing-card__title">Manager</span>
+                    <span class="landing-card__desc">See top matches for a role, team summary, and promotion insights.</span>
+                </button>
+            </div>
+        </div>
+        <a href="#" class="back-to-landing" id="back-to-landing" style="display: none;">← Back to home</a>
+    </section>
+
+    <!-- App: Employee or Manager (hidden until chosen from landing) -->
+    <section class="page page--app page--hidden" id="page-app">
+        <header class="app-header">
+            <button type="button" class="btn-back" id="btn-back" aria-label="Back to home">← Back</button>
+            <div class="header-inner">
+                <div class="logo">TalentStrategyAI</div>
+                <p class="tagline">EY Talent Match</p>
+            </div>
+            <button type="button" class="btn-login" id="btn-login-app" aria-label="Login">Login</button>
+        </header>
+
+        <div class="app-container">
+            <main class="main-content">
+                <!-- ========== EMPLOYEE INTERFACE ========== -->
+                <section class="interface" id="interface-employee" aria-label="Employee interface">
+                    <section class="upload-section" aria-label="Resume upload">
+                        <h2 class="section-title">Resume</h2>
+                        <form id="resume-upload-form" class="upload-form upload-form--compact">
+                            <div class="upload-form-row">
+                                <div class="form-group form-group--inline form-group--file">
+                                    <label for="resume-file" class="file-input-label" id="resume-file-label">Choose file...</label>
+                                    <input type="file" id="resume-file" name="resume" accept=".pdf,.doc,.docx" class="file-input-native">
+                                    <small class="file-info">PDF, DOC, DOCX (max 10MB)</small>
+                                </div>
+                                <div class="form-group form-group--inline">
+                                    <label for="candidate-name" class="sr-only">Your name</label>
+                                    <input type="text" id="candidate-name" name="candidateName" placeholder="Your name" required>
+                                </div>
+                                <button type="submit" class="submit-btn submit-btn--compact" id="submit-btn">
+                                    <span class="btn-text">Upload</span>
+                                    <span class="btn-loader" style="display: none;">Uploading...</span>
+                                </button>
+                            </div>
+                        </form>
+                        <div id="upload-message" class="message" style="display: none;"></div>
+                    </section>
+
+                    <section class="match-section" aria-label="Your match by role">
+                        <h2 class="section-title">Your match by role</h2>
+                        <div id="employee-match-list" class="match-list" aria-live="polite">
+                            <p class="placeholder-text">Upload your resume and use the assistant below to see your match % for each open EY role.</p>
+                        </div>
+                    </section>
+
+                    <section class="chat-section" aria-label="AI assistant">
+                        <h2 class="section-title">Ask EY's Talent Manager</h2>
+                        <div class="chat-messages" id="chat-messages-employee" aria-live="polite"></div>
+                        <div class="chat-input-row">
+                            <input type="text" class="chat-input" id="chat-input-employee" placeholder="Ask EY's Talent Manager..." maxlength="500" aria-label="Ask EY's Talent Manager">
+                            <button type="button" class="chat-send" id="chat-send-employee" aria-label="Send">Send</button>
+                        </div>
+                        <div class="chat-presets-wrap">
+                            <div class="chat-presets" role="group" aria-label="Suggestions">
+                                <button type="button" class="preset-btn" data-preset="match_roles">Match my resume to open EY roles</button>
+                                <button type="button" class="preset-btn" data-preset="explain_match">Explain why I was matched (or not) to a role</button>
+                                <button type="button" class="preset-btn" data-preset="suggest_upskill">Suggest upskilling to improve my fit</button>
+                                <button type="button" class="preset-btn" data-preset="match_summary">Show my match summary</button>
+                            </div>
+                        </div>
+                    </section>
+                </section>
+
+                <!-- ========== MANAGER INTERFACE ========== -->
+                <section class="interface interface--hidden" id="interface-manager" aria-label="Manager interface">
+                    <section class="chat-section" aria-label="AI assistant">
+                        <h2 class="section-title">Ask EY's Talent Manager</h2>
+                        <div class="chat-messages" id="chat-messages-manager" aria-live="polite"></div>
+                        <div class="chat-input-row">
+                            <input type="text" class="chat-input" id="chat-input-manager" placeholder="Ask EY's Talent Manager..." maxlength="500" aria-label="Ask EY's Talent Manager">
+                            <button type="button" class="chat-send" id="chat-send-manager" aria-label="Send">Send</button>
+                        </div>
+                        <div class="chat-presets-wrap">
+                            <div class="chat-presets" role="group" aria-label="Suggestions">
+                                <button type="button" class="preset-btn preset-btn--manager" data-preset="match_employees_to_role">Match employees to an open role</button>
+                                <button type="button" class="preset-btn preset-btn--manager" data-preset="explain_employee_match">Explain why an employee was matched (or not) to a role</button>
+                                <button type="button" class="preset-btn preset-btn--manager" data-preset="top_employees_for_role">See top employees for a role by match %</button>
+                                <button type="button" class="preset-btn preset-btn--manager" data-preset="team_match_summary">View match summary for my team</button>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="match-section" aria-label="Top employees for role">
+                        <h2 class="section-title">Top employees for a role</h2>
+                        <div id="manager-match-list" class="match-list" aria-live="polite">
+                            <p class="placeholder-text">Use the assistant above to see employees ranked by match % for a role.</p>
+                        </div>
+                    </section>
+                </section>
+            </main>
+        </div>
+    </section>
+
+    <!-- EY logo: bottom right on chatbot (Employee/Manager) only -->
+    <div class="ey-logo-bottom" aria-hidden="true">
+        <img src="images/ey-logo.svg" alt="EY" class="ey-logo-img">
+    </div>
+
     <script src="js/app.js"></script>
 </body>
 </html>
-

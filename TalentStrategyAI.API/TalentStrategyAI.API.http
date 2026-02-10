@@ -1,6 +1,13 @@
 @TalentStrategyAI.API_HostAddress = http://localhost:5278
 
-GET {{TalentStrategyAI.API_HostAddress}}/weatherforecast/
-Accept: application/json
+### Resume upload (multipart; use in client or Swagger)
+# POST {{TalentStrategyAI.API_HostAddress}}/api/resume/upload
+# Content-Type: multipart/form-data
 
-###
+### Chat (AI assistant preset)
+POST {{TalentStrategyAI.API_HostAddress}}/api/chat
+Content-Type: application/json
+
+{
+  "preset": "match_roles"
+}
