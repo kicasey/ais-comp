@@ -624,28 +624,6 @@ function escapeHtml(s) {
     return div.innerHTML;
 }
 
-// ----- Custom manager jobs: stored locally so managers can add roles -----
-var CUSTOM_JOBS_STORAGE_KEY = 'talentStrategyCustomJobs';
-
-function loadCustomJobs() {
-    try {
-        var raw = localStorage.getItem(CUSTOM_JOBS_STORAGE_KEY);
-        if (!raw) return [];
-        var parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-        return [];
-    }
-}
-
-function saveCustomJobs(list) {
-    try {
-        localStorage.setItem(CUSTOM_JOBS_STORAGE_KEY, JSON.stringify(list || []));
-    } catch (e) {
-        // ignore
-    }
-}
-
 // ----- Manager flow: jobs list → job panel → recommend employees → employee popout (AI explanation) -----
 function setupManagerFlow() {
     var jobsListEl = document.getElementById('manager-jobs-list');
@@ -691,7 +669,7 @@ function setupManagerFlow() {
         jobDetailEl.innerHTML =
             '<div class="job-detail-title">' + escapeHtml(j.title || j.Title || '') + '</div>' +
             '<div class="job-detail-meta">' + escapeHtml(j.department || j.Department || '') + ' · ' + escapeHtml(j.location || j.Location || '') + '</div>' +
-            (j.sourceUrl ? '<div class="job-detail-link"><a href="' + escapeHtml(j.sourceUrl) + '" target="_blank" rel="noopener">View EY posting</a></div>' : '') +
+            ((j.sourceUrl || j.SourceUrl) ? '<div class="job-detail-link"><a href="' + escapeHtml(j.sourceUrl || j.SourceUrl) + '" target="_blank" rel="noopener">View EY posting</a></div>' : '') +
             '<div class="job-detail-desc">' + escapeHtml(j.description || j.Description || '') + '</div>';
         jobPanel.classList.remove('manager-panel--closed');
         jobPanel.classList.add('manager-panel--open');
@@ -734,30 +712,11 @@ function setupManagerFlow() {
                                     title: d.title || d.Title || jtitle,
                                     department: d.department || d.Department || jdept,
                                     location: d.location || d.Location || jloc,
-                                    description: d.description || d.Description || ''
+                                    description: d.description || d.Description || '',
+                                    sourceUrl: d.sourceUrl || d.SourceUrl || job.sourceUrl || job.SourceUrl || ''
                                 });
                             })
                             .catch(function () { jobsListEl.innerHTML = '<p class="placeholder-text">Could not load job details.</p>'; });
-                    });
-                    jobsListEl.appendChild(card);
-                });
-
-                var customJobs = loadCustomJobs();
-                customJobs.forEach(function (job) {
-                    var jid = job.id;
-                    var jtitle = job.title || '';
-                    var jdept = job.department || '';
-                    var jloc = job.location || '';
-                    var card = document.createElement('button');
-                    card.type = 'button';
-                    card.className = 'job-card job-card--custom';
-                    card.setAttribute('data-job-id', jid);
-                    card.innerHTML =
-                        '<div class="job-card__title">' + escapeHtml(jtitle) + '</div>' +
-                        '<div class="job-card__meta">' + escapeHtml(jdept) + ' · ' + escapeHtml(jloc) + '</div>' +
-                        '<div class="job-card__badge">Custom</div>';
-                    card.addEventListener('click', function () {
-                        openJobPanel(job);
                     });
                     jobsListEl.appendChild(card);
                 });
@@ -767,30 +726,7 @@ function setupManagerFlow() {
                 }
             })
             .catch(function () {
-                var customJobs = loadCustomJobs();
-                jobsListEl.innerHTML = '';
-                if (customJobs.length) {
-                    customJobs.forEach(function (job) {
-                        var jid = job.id;
-                        var jtitle = job.title || '';
-                        var jdept = job.department || '';
-                        var jloc = job.location || '';
-                        var card = document.createElement('button');
-                        card.type = 'button';
-                        card.className = 'job-card job-card--custom';
-                        card.setAttribute('data-job-id', jid);
-                        card.innerHTML =
-                            '<div class="job-card__title">' + escapeHtml(jtitle) + '</div>' +
-                            '<div class="job-card__meta">' + escapeHtml(jdept) + ' · ' + escapeHtml(jloc) + '</div>' +
-                            '<div class="job-card__badge">Custom</div>';
-                        card.addEventListener('click', function () {
-                            openJobPanel(job);
-                        });
-                        jobsListEl.appendChild(card);
-                    });
-                } else {
-                    jobsListEl.innerHTML = '<p class="placeholder-text">Could not load jobs. Try again later.</p>';
-                }
+                jobsListEl.innerHTML = '<p class="placeholder-text">Could not load jobs. Try again later.</p>';
             });
     }
     window.loadManagerJobs = loadManagerJobs;
@@ -920,21 +856,38 @@ function setupManagerFlow() {
                 if (addJobMessage) addJobMessage.textContent = 'Please enter at least a job title.';
                 return;
             }
-            var now = Date.now();
-            var job = {
-                id: 'custom-' + now,
+            var payload = {
                 title: title,
                 department: deptInput ? deptInput.value.trim() : '',
                 location: locInput ? locInput.value.trim() : '',
                 description: descInput ? descInput.value.trim() : '',
                 sourceUrl: linkInput ? linkInput.value.trim() : ''
             };
-            var jobs = loadCustomJobs();
-            jobs.push(job);
-            saveCustomJobs(jobs);
-            if (addJobMessage) addJobMessage.textContent = 'Job added. It will appear in your list below.';
-            hideAddJobPanel();
-            loadManagerJobs();
+            if (addJobMessage) addJobMessage.textContent = 'Saving job...';
+            fetch('/api/jobs', {
+                method: 'POST',
+                headers: Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader()),
+                body: JSON.stringify(payload)
+            })
+                .then(function (res) {
+                    if (!res.ok) {
+                        return res.text().then(function (text) {
+                            var data = null;
+                            try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+                            var msg = (data && (data.message || data.Message)) || 'Could not save job.';
+                            throw new Error(msg);
+                        });
+                    }
+                    return res.json();
+                })
+                .then(function () {
+                    if (addJobMessage) addJobMessage.textContent = '';
+                    hideAddJobPanel();
+                    loadManagerJobs();
+                })
+                .catch(function (err) {
+                    if (addJobMessage) addJobMessage.textContent = err && err.message ? err.message : 'Could not save job.';
+                });
         });
     }
 }

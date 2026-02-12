@@ -1,5 +1,8 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using TalentStrategyAI.API.Data;
+using TalentStrategyAI.API.Models;
 
 namespace TalentStrategyAI.API.Controllers;
 
@@ -15,34 +18,71 @@ public class JobsController : ControllerBase
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
     private readonly IWebHostEnvironment _env;
+    private readonly AppDbContext _db;
 
     public JobsController(
         ILogger<JobsController> logger,
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
-        IWebHostEnvironment env)
+        IWebHostEnvironment env,
+        AppDbContext db)
     {
         _logger = logger;
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
         _env = env;
+        _db = db;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetJobs()
     {
+        var externalJobs = Array.Empty<JobDto>();
         var path = (_configuration["ResumeApi:JobsPath"] ?? "api/jobs").TrimStart('/');
         var (success, data) = await TryGetFromApiAsync<JobDto[]>(path);
         if (success && data != null && data.Length > 0)
         {
-            return Ok(data);
+            externalJobs = data;
         }
-        return Ok(await GetJobsFromTestDataAsync());
+        else
+        {
+            externalJobs = await GetJobsFromTestDataAsync();
+        }
+
+        var customJobs = await _db.Jobs.AsNoTracking().ToListAsync();
+        var customDtos = customJobs.Select(j => new JobDto
+        {
+            Id = j.Id,
+            Title = j.Title,
+            Department = j.Department ?? "",
+            Location = j.Location ?? "",
+            Description = j.Description,
+            SourceUrl = j.SourceUrl
+        }).ToArray();
+
+        var all = externalJobs.Concat(customDtos).ToArray();
+        return Ok(all);
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetJob(string id)
     {
+        // Check custom jobs stored in local database first
+        var localJob = await _db.Jobs.AsNoTracking().FirstOrDefaultAsync(j => j.Id == id);
+        if (localJob != null)
+        {
+            var dto = new JobDetailDto
+            {
+                Id = localJob.Id,
+                Title = localJob.Title,
+                Department = localJob.Department ?? "",
+                Location = localJob.Location ?? "",
+                Description = localJob.Description ?? "",
+                SourceUrl = localJob.SourceUrl
+            };
+            return Ok(dto);
+        }
+
         var jobsPath = _configuration["ResumeApi:JobsPath"] ?? "api/jobs";
         var path = $"{jobsPath.TrimEnd('/')}/{Uri.EscapeDataString(id)}";
         var (success, data) = await TryGetFromApiAsync<JobDetailDto>(path);
@@ -54,6 +94,48 @@ public class JobsController : ControllerBase
         if (job == null)
             return NotFound(new { message = "Job not found." });
         return Ok(job);
+    }
+
+    /// <summary>
+    /// Create a custom job posting stored in the local jobs table.
+    /// This is used by managers when they manually add a job or paste an EY job link.
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> CreateJob([FromBody] JobDto dto)
+    {
+        if (dto == null || string.IsNullOrWhiteSpace(dto.Title))
+        {
+            return BadRequest(new { message = "Job title is required." });
+        }
+
+        var id = string.IsNullOrWhiteSpace(dto.Id)
+            ? $"job-{Guid.NewGuid():N}"
+            : dto.Id;
+
+        var entity = new Job
+        {
+            Id = id,
+            Title = dto.Title.Trim(),
+            Department = (dto.Department ?? "").Trim(),
+            Location = (dto.Location ?? "").Trim(),
+            Description = (dto.Description ?? "").Trim(),
+            SourceUrl = string.IsNullOrWhiteSpace(dto.SourceUrl) ? null : dto.SourceUrl.Trim()
+        };
+
+        _db.Jobs.Add(entity);
+        await _db.SaveChangesAsync();
+
+        var created = new JobDetailDto
+        {
+            Id = entity.Id,
+            Title = entity.Title,
+            Department = entity.Department ?? "",
+            Location = entity.Location ?? "",
+            Description = entity.Description ?? "",
+            SourceUrl = entity.SourceUrl
+        };
+
+        return CreatedAtAction(nameof(GetJob), new { id = created.Id }, created);
     }
 
     [HttpGet("{jobId}/recommendations")]
@@ -235,6 +317,7 @@ public class JobsController : ControllerBase
         public string Department { get; set; } = "";
         public string Location { get; set; } = "";
         public string? Description { get; set; }
+        public string? SourceUrl { get; set; }
     }
 
     public class JobDetailDto : JobDto

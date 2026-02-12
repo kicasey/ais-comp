@@ -12,6 +12,7 @@ public class AppDbContext : DbContext
 
     public DbSet<EmployeeProfile> EmployeeProfiles { get; set; }
     public DbSet<User> Users { get; set; }
+    public DbSet<Job> Jobs { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -22,6 +23,7 @@ public class AppDbContext : DbContext
     {
         modelBuilder.Entity<User>().HasIndex(u => u.Email).IsUnique();
         modelBuilder.Entity<EmployeeProfile>().HasIndex(p => p.UserId);
+        modelBuilder.Entity<Job>().HasKey(j => j.Id);
     }
 }
 
