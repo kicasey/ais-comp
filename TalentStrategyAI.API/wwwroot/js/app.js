@@ -746,6 +746,7 @@ function setupManagerFlow() {
                 var strengths = c.strengths || [];
                 var gaps = c.gaps || [];
                 var reason = c.reason || '';
+                var plan = c.upskilling_plan || [];
 
                 var html = '<h3 style="margin:0 0 0.25rem;color:var(--ey-yellow)">' + escapeHtml(name) + '</h3>';
                 if (pct != null) html += '<p style="margin:0 0 0.75rem;font-size:0.9rem;color:#9ca3af">Match score: <strong style="color:var(--ey-yellow)">' + pct + '%</strong></p>';
@@ -760,85 +761,35 @@ function setupManagerFlow() {
                     gaps.forEach(function (g) { html += '<li style="margin-bottom:0.25rem;line-height:1.4">' + escapeHtml(g) + '</li>'; });
                     html += '</ul>';
                 }
-                // Upskilling plan placeholder
+
+                // Upskilling plan — already included in the candidate data from the original AI call
                 html += '<div style="margin-top:1rem;border-top:1px solid var(--ey-border);padding-top:0.75rem">';
                 html += '<p style="margin:0 0 0.5rem;font-weight:600;color:var(--ey-yellow)">Upskilling Plan</p>';
-                html += '<p id="upskilling-plan-content" style="color:#9ca3af;font-size:0.85rem">Generating upskilling plan…</p>';
+                if (plan.length > 0) {
+                    html += '<ol style="margin:0;padding-left:1.25rem;color:#e5e7eb">';
+                    plan.forEach(function (s) {
+                        html += '<li style="margin-bottom:0.5rem;line-height:1.4">';
+                        html += '<strong style="color:var(--ey-yellow)">' + escapeHtml(s.step || s.title || '') + '</strong>';
+                        if (s.description) html += '<br><span style="font-size:0.82rem;color:#d1d5db">' + escapeHtml(s.description) + '</span>';
+                        html += '</li>';
+                    });
+                    html += '</ol>';
+                } else {
+                    html += '<p style="color:#9ca3af;font-size:0.85rem">No upskilling plan available.</p>';
+                }
                 html += '</div>';
 
                 employeePopoutTitle.textContent = 'Candidate Details';
                 employeePopoutContent.innerHTML = html;
                 employeePopout.classList.remove('employee-popout--closed');
                 employeePopout.classList.add('employee-popout--open');
-
-                // Fire AI call for upskilling plan
-                var jobTitle = selectedJobTitle || selectedJobId || 'the selected role';
-                var gapList = gaps.length > 0 ? gaps.join(', ') : 'general skill improvement';
-                var strengthList = strengths.length > 0 ? strengths.join(', ') : 'none listed';
-                var upskillPrompt = 'INSTRUCTION: Create a concise upskilling plan for a candidate named "' + (name || empId) + '" being considered for the role "' + jobTitle + '". '
-                    + 'Their strengths: ' + strengthList + '. '
-                    + 'Their gaps: ' + gapList + '. '
-                    + 'Provide a practical, actionable upskilling plan with specific courses, certifications, or training to close these gaps. '
-                    + 'Format as a numbered list of 3-6 concrete steps. Each step has a title and brief description (1-2 sentences). '
-                    + 'Respond with ONLY valid JSON, nothing else: '
-                    + '{"upskilling_plan":[{"step":"Step title","description":"What to do and why"}]}';
-
-                var upskillHeaders = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
-                fetch('/api/chat', {
-                    method: 'POST',
-                    headers: upskillHeaders,
-                    body: JSON.stringify({ preset: 'custom', customText: upskillPrompt })
-                })
-                .then(function (res) { return res.ok ? res.json() : Promise.reject(new Error('Failed')); })
-                .then(function (data) {
-                    var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
-                    var plan = null;
-                    if (item && item.upskilling_plan) plan = item.upskilling_plan;
-                    if (!plan && item && item.response) {
-                        var raw = item.response;
-                        raw = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
-                        try { var p = JSON.parse(raw); plan = p.upskilling_plan || null; } catch (e) {
-                            var si = raw.indexOf('{');
-                            if (si !== -1) {
-                                var bc = 0, ei = si;
-                                for (var i = si; i < raw.length && i < si + 5000; i++) {
-                                    if (raw[i] === '{') bc++;
-                                    if (raw[i] === '}') { bc--; if (bc === 0) { ei = i + 1; break; } }
-                                }
-                                try { var ex = JSON.parse(raw.substring(si, ei)); plan = ex.upskilling_plan || null; } catch (e2) {}
-                            }
-                        }
-                    }
-                    var el = document.getElementById('upskilling-plan-content');
-                    if (!el) return;
-                    if (plan && plan.length > 0) {
-                        var ph = '<ol style="margin:0;padding-left:1.25rem;color:#e5e7eb">';
-                        plan.forEach(function (s) {
-                            ph += '<li style="margin-bottom:0.5rem;line-height:1.4">';
-                            ph += '<strong style="color:var(--ey-yellow)">' + escapeHtml(s.step || s.title || '') + '</strong>';
-                            if (s.description) ph += '<br><span style="font-size:0.82rem;color:#d1d5db">' + escapeHtml(s.description) + '</span>';
-                            ph += '</li>';
-                        });
-                        ph += '</ol>';
-                        el.innerHTML = ph;
-                    } else if (item && item.response) {
-                        el.style.color = '#e5e7eb';
-                        el.textContent = item.response;
-                    } else {
-                        el.textContent = 'No upskilling plan available.';
-                    }
-                })
-                .catch(function () {
-                    var el = document.getElementById('upskilling-plan-content');
-                    if (el) el.textContent = 'Could not generate upskilling plan.';
-                });
             }
             fetch('/api/chat', {
                 method: 'POST',
                 headers: recHeaders,
                 body: JSON.stringify({
                     preset: 'recommend_for_job',
-                    customText: 'INSTRUCTION: You must match every candidate in the database to the job titled "' + (selectedJobTitle || selectedJobId) + '". Score each candidate 0-100 based on how well their skills and experience fit this role. Do NOT ask clarifying questions. Do NOT explain. Respond with ONLY this JSON, nothing else: {"top_candidates":[{"candidate_name":"Full Name","resume_id":"the-resume-id","score":85}]}. Include ALL candidates, ranked by score descending.'
+                    customText: 'INSTRUCTION: You must match every candidate in the database to the job titled "' + (selectedJobTitle || selectedJobId) + '". Score each candidate 0-100 based on how well their skills and experience fit this role. For each candidate, also provide a practical upskilling plan with 3-5 specific courses, certifications, or training activities to close their gaps for this role. Do NOT ask clarifying questions. Do NOT explain. Respond with ONLY this JSON, nothing else: {"top_candidates":[{"candidate_name":"Full Name","resume_id":"the-resume-id","score":85,"strengths":["strength1"],"gaps":["gap1"],"reason":"why they match or dont","upskilling_plan":[{"step":"Step title","description":"What to do and why"}]}]}. Include ALL candidates, ranked by score descending.'
                 })
             })
                 .then(function (res) { return res.ok ? res.json() : Promise.reject(new Error('Failed to load recommendations')); })
@@ -881,9 +832,18 @@ function setupManagerFlow() {
                         renderCandidates(candidates);
                         return;
                     }
-                    // If AI returned text but no candidates, show the text
+                    // If AI returned text but no candidates, show a friendly message
+                    // Don't dump raw JSON — check if the response is just a JSON blob with empty candidates
                     if (item && item.response) {
-                        recommendationsListEl.innerHTML = '<p class="placeholder-text">' + escapeHtml(item.response) + '</p>';
+                        var respText = item.response;
+                        try {
+                            var respJson = (typeof respText === 'string') ? JSON.parse(respText) : respText;
+                            if (respJson && respJson.top_candidates && respJson.top_candidates.length === 0) {
+                                recommendationsListEl.innerHTML = '<p class="placeholder-text">No matching candidates found for this role.</p>';
+                                return;
+                            }
+                        } catch (e) { /* not JSON, show as text */ }
+                        recommendationsListEl.innerHTML = '<p class="placeholder-text">' + escapeHtml(respText) + '</p>';
                         return;
                     }
                     recommendationsListEl.innerHTML = '<p class="placeholder-text">No recommendations returned.</p>';
