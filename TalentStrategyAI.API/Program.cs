@@ -88,8 +88,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Enable static files and default files (for serving index.html at root)
-app.UseStaticFiles();
 app.UseDefaultFiles();
+app.UseStaticFiles();
 
 // Map controllers
 app.MapControllers();

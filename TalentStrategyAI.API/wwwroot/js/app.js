@@ -1,6 +1,7 @@
 // TalentStrategyAI – Landing → Employee | Manager. EY Talent Match.
 
 var AUTH_STORAGE_KEY = 'talentStrategyAuth';
+var RESUME_API_BASE = 'https://resume-api.campbellthompson.com';
 
 document.addEventListener('DOMContentLoaded', function () {
     initializeApp();
@@ -379,7 +380,7 @@ function setupResumeUploadForm() {
 
         try {
             var formData = new FormData(form);
-            var response = await fetch('/api/resume/upload', { method: 'POST', body: formData });
+            var response = await fetch(RESUME_API_BASE + '/api/resume/upload', { method: 'POST', body: formData });
             var result = await response.json();
             if (response.ok) {
                 showUploadMessage('Resume uploaded successfully!', 'success');
@@ -421,11 +422,12 @@ function setupChatPresets(role) {
     var messagesEl = role === 'employee' ? document.getElementById('chat-messages-employee') : document.getElementById('chat-messages-manager');
     if (!messagesEl) return;
 
+    var chatEndpoint = role === 'employee' ? '/api/employee-chat' : '/api/chat';
     presetButtons.forEach(function (btn) {
         btn.addEventListener('click', function (e) {
             e.preventDefault();
             var preset = this.getAttribute('data-preset');
-            sendPresetAndShowResponse(preset, messagesEl);
+            sendPresetAndShowResponse(preset, messagesEl, chatEndpoint);
         });
     });
 }
@@ -439,28 +441,49 @@ function setupChatSendButtons() {
     var messagesEmp = document.getElementById('chat-messages-employee');
     var messagesMgr = document.getElementById('chat-messages-manager');
 
-    function sendFromInput(inputEl, messagesEl) {
+    function sendFromInput(inputEl, messagesEl, chatEndpoint) {
         if (!inputEl || !messagesEl) return;
         var text = (inputEl.value || '').trim();
         if (!text) return;
         inputEl.value = '';
+        var endpoint = chatEndpoint || '/api/chat';
+        var auth = getStoredAuth();
+        var payload = { preset: 'custom', customText: text };
+        if (auth) {
+            payload.userEmail = auth.email || '';
+            payload.userName = auth.displayName || '';
+            payload.userId = auth.userId || '';
+        }
         appendChatMessage(messagesEl, 'You', text, 'user');
         var loadingId = 'loading-' + Date.now();
         appendChatMessage(messagesEl, 'Assistant', '…', 'assistant', true, loadingId);
         var headers = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
-        fetch('/api/chat', {
+        fetch(RESUME_API_BASE + endpoint, {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify({ preset: 'custom', customText: text })
+            body: JSON.stringify(payload)
         })
             .then(function (res) {
                 removeLoadingMessage(messagesEl, loadingId);
-                if (res.ok) return res.json();
-                return res.json().then(function (data) { throw new Error(data.message || 'Request failed'); });
+                return res.text().then(function (text) {
+                    var data = null;
+                    try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+                    if (!res.ok) throw new Error((data && data.message) || 'Request failed');
+                    return data;
+                });
             })
             .then(function (data) {
-                var responseText = (data && data.response) ? data.response : (data && data.message) ? data.message : 'Done.';
-                appendChatMessage(messagesEl, 'Assistant', responseText, 'assistant');
+                if (!data) {
+                    appendChatMessage(messagesEl, 'Assistant', 'No response received. You may need to upload your resume first.', 'assistant');
+                    return;
+                }
+                var structured = formatResumeApiStructuredBlock(data);
+                if (structured) {
+                    appendChatMessage(messagesEl, 'Assistant', structured, 'assistant', false, undefined, true);
+                } else {
+                    var responseText = (data && data.response) ? data.response : (data && data.message) ? data.message : 'Done.';
+                    appendChatMessage(messagesEl, 'Assistant', responseText, 'assistant');
+                }
             })
             .catch(function (err) {
                 removeLoadingMessage(messagesEl, loadingId);
@@ -470,44 +493,65 @@ function setupChatSendButtons() {
     }
 
     if (sendEmployee && inputEmployee && messagesEmp) {
-        sendEmployee.addEventListener('click', function () { sendFromInput(inputEmployee, messagesEmp); });
+        sendEmployee.addEventListener('click', function () { sendFromInput(inputEmployee, messagesEmp, '/api/employee-chat'); });
         inputEmployee.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                sendFromInput(inputEmployee, messagesEmp);
+                sendFromInput(inputEmployee, messagesEmp, '/api/employee-chat');
             }
         });
     }
     if (sendManager && inputManager && messagesMgr) {
-        sendManager.addEventListener('click', function () { sendFromInput(inputManager, messagesMgr); });
+        sendManager.addEventListener('click', function () { sendFromInput(inputManager, messagesMgr, '/api/chat'); });
         inputManager.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                sendFromInput(inputManager, messagesMgr);
+                sendFromInput(inputManager, messagesMgr, '/api/chat');
             }
         });
     }
 }
 
-function sendPresetAndShowResponse(preset, messagesEl) {
+function sendPresetAndShowResponse(preset, messagesEl, chatEndpoint) {
+    var endpoint = chatEndpoint || '/api/chat';
+    var auth = getStoredAuth();
+    var payload = { preset: preset };
+    if (auth) {
+        payload.userEmail = auth.email || '';
+        payload.userName = auth.displayName || '';
+        payload.userId = auth.userId || '';
+    }
     appendChatMessage(messagesEl, 'You', getPresetLabel(preset), 'user');
     var loadingId = 'loading-' + Date.now();
     appendChatMessage(messagesEl, 'Assistant', '…', 'assistant', true, loadingId);
 
     var headers = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
-    fetch('/api/chat', {
+    fetch(RESUME_API_BASE + endpoint, {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify({ preset: preset })
+        body: JSON.stringify(payload)
     })
         .then(function (res) {
             removeLoadingMessage(messagesEl, loadingId);
-            if (res.ok) return res.json();
-            return res.json().then(function (data) { throw new Error(data.message || 'Request failed'); });
+            return res.text().then(function (text) {
+                var data = null;
+                try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+                if (!res.ok) throw new Error((data && data.message) || 'Request failed');
+                return data;
+            });
         })
         .then(function (data) {
-            var text = (data && data.response) ? data.response : (data && data.message) ? data.message : (typeof data === 'string') ? data : 'Done.';
-            appendChatMessage(messagesEl, 'Assistant', text, 'assistant');
+            if (!data) {
+                appendChatMessage(messagesEl, 'Assistant', 'No response received. You may need to upload your resume first.', 'assistant');
+                return;
+            }
+            var structured = formatResumeApiStructuredBlock(data);
+            if (structured) {
+                appendChatMessage(messagesEl, 'Assistant', structured, 'assistant', false, undefined, true);
+            } else {
+                var text = (data && data.response) ? data.response : (data && data.message) ? data.message : (typeof data === 'string') ? data : 'Done.';
+                appendChatMessage(messagesEl, 'Assistant', text, 'assistant');
+            }
         })
         .catch(function (err) {
             removeLoadingMessage(messagesEl, loadingId);
@@ -530,13 +574,41 @@ function getPresetLabel(preset) {
     return labels[preset] || preset;
 }
 
-function appendChatMessage(container, role, text, roleClass, isLoading, id) {
+function appendChatMessage(container, role, text, roleClass, isLoading, id, contentAsHtml) {
     var div = document.createElement('div');
     div.className = 'chat-message chat-message--' + roleClass + (isLoading ? ' chat-message--loading' : '');
     if (id) div.id = id;
-    div.innerHTML = '<div class="chat-message__role">' + escapeHtml(role) + '</div><div class="chat-message__text">' + escapeHtml(text) + '</div>';
+    var textHtml = contentAsHtml ? text : escapeHtml(text);
+    div.innerHTML = '<div class="chat-message__role">' + escapeHtml(role) + '</div><div class="chat-message__text">' + textHtml + '</div>';
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
+}
+
+function formatResumeApiStructuredBlock(data) {
+    var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
+    if (!item || typeof item !== 'object') return null;
+    var msg = item.assistant_message;
+    var question = item.clarifying_question;
+    var candidates = item.top_candidates;
+    if (!msg && !question && (!candidates || !candidates.length)) return null;
+    var html = '';
+    if (msg) html += '<p class="chat-structured__message">' + escapeHtml(msg) + '</p>';
+    if (question) html += '<p class="chat-structured__question"><strong>Clarifying:</strong> ' + escapeHtml(question) + '</p>';
+    if (candidates && candidates.length > 0) {
+        html += '<div class="chat-structured__candidates"><strong>Top candidates</strong><ul>';
+        for (var i = 0; i < candidates.length; i++) {
+            var c = candidates[i];
+            var name = (c.candidate_name || c.display || 'Unknown').toString();
+            var score = c.score != null ? c.score + '%' : '';
+            var reason = (c.reason || '').toString().slice(0, 120);
+            if (reason.length === 120) reason += '…';
+            html += '<li><span class="chat-structured__name">' + escapeHtml(name) + '</span>' +
+                (score ? ' <span class="chat-structured__score">' + escapeHtml(score) + '</span>' : '') +
+                (reason ? ' — ' + escapeHtml(reason) : '') + '</li>';
+        }
+        html += '</ul></div>';
+    }
+    return html || null;
 }
 
 function removeLoadingMessage(container, id) {
@@ -636,21 +708,37 @@ function setupManagerFlow() {
             if (!selectedJobId) return;
             recommendationsListEl.innerHTML = '<p class="placeholder-text">Loading recommendations…</p>';
             recommendationsWrap.style.display = 'block';
-            if (recommendationsJobTitle) recommendationsJobTitle.textContent = ' for \"' + (selectedJobTitle || '') + '\"';
-            fetch('/api/jobs/' + encodeURIComponent(selectedJobId) + '/recommendations', { headers: getAuthHeader() })
+            if (recommendationsJobTitle) recommendationsJobTitle.textContent = ' for "' + (selectedJobTitle || '') + '"';
+            var recHeaders = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
+            fetch(RESUME_API_BASE + '/api/chat', {
+                method: 'POST',
+                headers: recHeaders,
+                body: JSON.stringify({
+                    preset: 'recommend_for_job',
+                    customText: 'Give me the top 3 candidates for this position: ' + (selectedJobTitle || selectedJobId) + '. Only return resume_id and confidence score.'
+                })
+            })
                 .then(function (res) { return res.ok ? res.json() : Promise.reject(new Error('Failed to load recommendations')); })
-                .then(function (list) {
+                .then(function (data) {
+                    var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
+                    var candidates = (item && item.top_candidates) ? item.top_candidates : [];
+                    if (candidates.length === 0) {
+                        recommendationsListEl.innerHTML = '<p class="placeholder-text">No recommendations returned.</p>';
+                        return;
+                    }
                     recommendationsListEl.innerHTML = '';
-                    list.forEach(function (emp) {
+                    candidates.slice(0, 3).forEach(function (c) {
+                        var name = c.candidate_name || c.display || c.resume_id || '';
+                        var empId = c.resume_id || '';
+                        var pct = c.score != null ? c.score : null;
                         var card = document.createElement('button');
                         card.type = 'button';
                         card.className = 'recommendation-card';
-                        card.setAttribute('data-employee-id', emp.employeeId || emp.EmployeeId || '');
-                        card.setAttribute('data-employee-name', emp.name || emp.Name || '');
-                        var pct = emp.confidencePercent != null ? emp.confidencePercent : (emp.ConfidencePercent != null ? emp.ConfidencePercent : null);
-                        card.innerHTML = '<span class="recommendation-card__name">' + escapeHtml(emp.name || emp.Name || '') + '</span><span class="recommendation-card__pct">' + (pct != null ? pct + '%' : '—') + '</span>';
+                        card.setAttribute('data-employee-id', empId);
+                        card.setAttribute('data-employee-name', name);
+                        card.innerHTML = '<span class="recommendation-card__name">' + escapeHtml(name) + '</span><span class="recommendation-card__pct">' + (pct != null ? pct + '%' : '—') + '</span>';
                         card.addEventListener('click', function () {
-                            openEmployeePopout(emp.employeeId || emp.EmployeeId || '', emp.name || emp.Name || 'Employee');
+                            openEmployeePopout(empId, name || 'Employee');
                         });
                         recommendationsListEl.appendChild(card);
                     });
@@ -668,7 +756,7 @@ function setupManagerFlow() {
         employeePopout.classList.add('employee-popout--open');
 
         var popoutHeaders = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
-        fetch('/api/chat', {
+        fetch(RESUME_API_BASE + '/api/chat', {
             method: 'POST',
             headers: popoutHeaders,
             body: JSON.stringify({

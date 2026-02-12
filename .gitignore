@@ -343,3 +343,6 @@ FodyWeavers.xsd
 
 # Uploaded files
 **/Uploads/
+
+# Docker image tarballs
+*.tar.gz
