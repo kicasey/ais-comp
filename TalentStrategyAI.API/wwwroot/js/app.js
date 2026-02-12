@@ -6,12 +6,17 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeApp();
 });
 
+var THEME_STORAGE_KEY = 'talentStrategyTheme';
+
 function initializeApp() {
+    applyStoredTheme();
     ensureAuthGate();
     setupLanding();
     setupBackButton();
     setupAuth();
     setupResumeUploadForm();
+    loadEmployeeProfileWhenNeeded();
+    setupThemeToggle();
     setupChatPresets('employee');
     setupChatPresets('manager');
     setupChatSendButtons();
@@ -313,7 +318,89 @@ function showAppByRole(role) {
     } else {
         if (emp) emp.classList.remove('interface--hidden');
         if (mgr) mgr.classList.add('interface--hidden');
+        loadEmployeeProfile();
     }
+}
+
+function loadEmployeeProfileWhenNeeded() {
+    var auth = getStoredAuth();
+    if (!auth || (auth.role || '').toLowerCase() !== 'employee') return;
+    var emp = document.getElementById('interface-employee');
+    if (emp && !emp.classList.contains('interface--hidden')) loadEmployeeProfile();
+}
+
+function loadEmployeeProfile() {
+    var nameEl = document.getElementById('profile-name');
+    var emailEl = document.getElementById('profile-email');
+    var valueEl = document.getElementById('profile-resume-value');
+    if (!valueEl) return;
+    var headers = getAuthHeader();
+    if (!headers.Authorization) {
+        if (nameEl) nameEl.textContent = '';
+        if (emailEl) emailEl.textContent = '';
+        valueEl.textContent = 'Sign in to see your profile.';
+        return;
+    }
+    valueEl.textContent = 'Loading…';
+    fetch('/api/resume/profile', { headers: headers })
+        .then(function (res) { return res.json().catch(function () { return null; }); })
+        .then(function (data) {
+            if (!data) { valueEl.textContent = 'Could not load profile.'; return; }
+            if (data.isEmployee) {
+                if (nameEl) nameEl.textContent = (data.displayName || data.name || '').trim() || '—';
+                if (emailEl) emailEl.textContent = (data.email || '').trim() || '—';
+                if (data.hasResume && data.resumeFileName) {
+                    valueEl.textContent = data.resumeFileName + (data.resumeUploadedAt ? ' (uploaded ' + formatResumeDate(data.resumeUploadedAt) + ')' : '');
+                    valueEl.classList.add('has-resume');
+                } else {
+                    valueEl.textContent = 'No resume on file. Upload one below.';
+                    valueEl.classList.remove('has-resume');
+                }
+            } else {
+                if (nameEl) nameEl.textContent = '';
+                if (emailEl) emailEl.textContent = '';
+                valueEl.textContent = 'Resume is for employee profiles only.';
+                valueEl.classList.remove('has-resume');
+            }
+        })
+        .catch(function () { valueEl.textContent = 'Could not load profile.'; });
+}
+
+function formatResumeDate(iso) {
+    if (!iso) return '';
+    try {
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (e) { return ''; }
+}
+
+function applyStoredTheme() {
+    var theme = localStorage.getItem(THEME_STORAGE_KEY) || 'dark';
+    document.body.setAttribute('data-theme', theme);
+}
+
+function setupThemeToggle() {
+    var toggles = document.querySelectorAll('.theme-toggle');
+    function updateAccessibility() {
+        var theme = document.body.getAttribute('data-theme') || 'dark';
+        var title = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+        var isDark = theme === 'dark';
+        toggles.forEach(function (el) {
+            el.setAttribute('title', title);
+            el.setAttribute('aria-checked', isDark ? 'true' : 'false');
+        });
+    }
+    updateAccessibility();
+    toggles.forEach(function (el) {
+        el.addEventListener('click', function () {
+            var theme = document.body.getAttribute('data-theme') || 'dark';
+            var next = theme === 'dark' ? 'light' : 'dark';
+            document.body.setAttribute('data-theme', next);
+            localStorage.setItem(THEME_STORAGE_KEY, next);
+            updateAccessibility();
+        });
+    });
 }
 
 function resetManagerPanel() {
@@ -378,14 +465,17 @@ function setupResumeUploadForm() {
         hideUploadMessage();
 
         try {
-            var formData = new FormData(form);
-            var response = await fetch('/api/resume/upload', { method: 'POST', body: formData });
-            var result = await response.json();
+            var formData = new FormData();
+            formData.append('resume', file);
+            var headers = getAuthHeader();
+            var response = await fetch('/api/resume/upload', { method: 'POST', headers: headers, body: formData });
+            var result = await response.json().catch(function () { return {}; });
             if (response.ok) {
-                showUploadMessage('Resume uploaded successfully!', 'success');
+                showUploadMessage('Resume saved to your profile.', 'success');
                 form.reset();
                 fileLabel.textContent = 'Choose file...';
                 fileLabel.classList.remove('file-selected');
+                loadEmployeeProfile();
             } else {
                 showUploadMessage(result.message || 'Upload failed. Please try again.', 'error');
             }
@@ -661,11 +751,23 @@ function setupManagerFlow() {
         });
     }
 
+    var popoutDragBtn = document.getElementById('employee-popout-drag');
+    function setPopoutCollapsed(collapsed) {
+        if (collapsed) {
+            employeePopout.classList.add('employee-popout--collapsed');
+            if (popoutDragBtn) popoutDragBtn.textContent = '▲';
+        } else {
+            employeePopout.classList.remove('employee-popout--collapsed');
+            if (popoutDragBtn) popoutDragBtn.textContent = '▼';
+        }
+    }
+
     function openEmployeePopout(employeeId, employeeName) {
         employeePopoutTitle.textContent = 'Match explanation: ' + employeeName;
         employeePopoutContent.textContent = 'Loading AI explanation…';
         employeePopout.classList.remove('employee-popout--closed');
         employeePopout.classList.add('employee-popout--open');
+        setPopoutCollapsed(false);
 
         var popoutHeaders = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
         fetch('/api/chat', {
@@ -690,7 +792,16 @@ function setupManagerFlow() {
     function closeEmployeePopout() {
         employeePopout.classList.add('employee-popout--closed');
         employeePopout.classList.remove('employee-popout--open');
+        employeePopout.classList.remove('employee-popout--collapsed');
+        if (popoutDragBtn) popoutDragBtn.textContent = '▼';
     }
 
     if (employeePopoutClose) employeePopoutClose.addEventListener('click', closeEmployeePopout);
+    if (popoutDragBtn) {
+        popoutDragBtn.addEventListener('click', function () {
+            if (!employeePopout.classList.contains('employee-popout--open')) return;
+            var collapsed = employeePopout.classList.toggle('employee-popout--collapsed');
+            popoutDragBtn.textContent = collapsed ? '▲' : '▼';
+        });
+    }
 }

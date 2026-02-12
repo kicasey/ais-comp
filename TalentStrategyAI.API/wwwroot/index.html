@@ -4,14 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TalentStrategyAI | EY Talent Match</title>
+    <link rel="icon" href="images/ey-logo.svg" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css?v=3">
 </head>
-<body class="page--landing">
-    <!-- EY logo: top right on landing only -->
-    <div class="ey-logo-top" aria-hidden="true">
+<body class="page--landing" data-theme="dark">
+    <!-- EY logo + theme toggle: top right on landing -->
+    <div class="ey-logo-top">
+        <div class="theme-switch theme-toggle" id="theme-toggle-landing" role="switch" aria-label="Toggle light/dark mode" title="Toggle light/dark mode" aria-checked="false">
+            <span class="theme-switch-track">
+                <span class="theme-switch-thumb">
+                    <svg class="theme-switch-icon theme-switch-icon--sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                    <svg class="theme-switch-icon theme-switch-icon--moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                </span>
+            </span>
+        </div>
         <img src="images/ey-logo.svg" alt="EY" class="ey-logo-img">
     </div>
 
@@ -94,6 +103,14 @@
                 <p class="tagline">EY Talent Match</p>
             </div>
             <div class="header-auth">
+                <div class="theme-switch theme-toggle theme-toggle--header" id="theme-toggle" role="switch" aria-label="Toggle light/dark mode" title="Toggle light/dark mode" aria-checked="false">
+                <span class="theme-switch-track">
+                    <span class="theme-switch-thumb">
+                        <svg class="theme-switch-icon theme-switch-icon--sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                        <svg class="theme-switch-icon theme-switch-icon--moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    </span>
+                </span>
+            </div>
                 <span class="header-user" id="header-user" style="display: none;"></span>
                 <button type="button" class="btn-login" id="btn-login-app" aria-label="Login">Login</button>
                 <button type="button" class="btn-logout" id="btn-logout" aria-label="Log out" style="display: none;">Log out</button>
@@ -104,18 +121,22 @@
             <main class="main-content">
                 <!-- ========== EMPLOYEE INTERFACE ========== -->
                 <section class="interface" id="interface-employee" aria-label="Employee interface">
-                    <section class="upload-section" aria-label="Resume upload">
-                        <h2 class="section-title">Resume</h2>
+                    <section class="profile-section" aria-label="Your profile">
+                        <h2 class="section-title">My profile</h2>
+                        <div id="employee-profile-card" class="profile-card">
+                            <p id="profile-name" class="profile-line"></p>
+                            <p id="profile-email" class="profile-line"></p>
+                            <div id="profile-resume-row" class="profile-resume-row">
+                                <span id="profile-resume-label">Your resume:</span>
+                                <span id="profile-resume-value" class="profile-resume-value">Loading…</span>
+                            </div>
+                        </div>
                         <form id="resume-upload-form" class="upload-form upload-form--compact">
                             <div class="upload-form-row">
                                 <div class="form-group form-group--inline form-group--file">
                                     <label for="resume-file" class="file-input-label" id="resume-file-label">Choose file...</label>
                                     <input type="file" id="resume-file" name="resume" accept=".pdf,.doc,.docx" class="file-input-native">
-                                    <small class="file-info">PDF, DOC, DOCX (max 10MB)</small>
-                                </div>
-                                <div class="form-group form-group--inline">
-                                    <label for="candidate-name" class="sr-only">Your name</label>
-                                    <input type="text" id="candidate-name" name="candidateName" placeholder="Your name" required>
+                                    <small class="file-info">PDF, DOC, DOCX (max 10MB) — one resume per profile</small>
                                 </div>
                                 <button type="submit" class="submit-btn submit-btn--compact" id="submit-btn">
                                     <span class="btn-text">Upload</span>
@@ -159,6 +180,7 @@
                             <div id="manager-jobs-list" class="jobs-list" aria-live="polite"><p class="placeholder-text">Loading job postings…</p></div>
                             <div id="manager-recommendations-wrap" class="recommendations-wrap" style="display: none;">
                                 <h2 class="section-title">Recommended employees <span id="manager-recommendations-job-title" class="section-title-sub"></span></h2>
+                                <p class="recommendations-instruction">Click an employee to see match details, strengths, and upskilling suggestions.</p>
                                 <div id="manager-recommendations-list" class="recommendations-list" aria-live="polite"></div>
                             </div>
                         </div>
@@ -171,6 +193,7 @@
                         </aside>
                     </div>
                     <div id="manager-employee-popout" class="employee-popout employee-popout--closed" aria-label="Employee match explanation">
+                        <button type="button" class="employee-popout-drag" id="employee-popout-drag" aria-label="Collapse or expand">▼</button>
                         <div class="employee-popout-inner">
                             <button type="button" class="employee-popout-close" id="employee-popout-close" aria-label="Close">×</button>
                             <h3 class="employee-popout-title" id="employee-popout-title">Match explanation</h3>

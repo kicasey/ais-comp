@@ -58,6 +58,7 @@ builder.Services.AddCors(options =>
 
 // Register services
 builder.Services.AddScoped<IOpenAIService, OpenAIService>();
+builder.Services.AddScoped<IResumeTextService, ResumeTextService>();
 
 // HttpClient for resume-api.campbellthompson.com (chat, jobs, recommendations)
 var resumeApiBase = builder.Configuration["ResumeApi:BaseUrl"];
