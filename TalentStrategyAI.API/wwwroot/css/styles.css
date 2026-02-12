@@ -983,15 +983,19 @@ body.page--landing .ey-logo-bottom {
     left: 0;
     right: 0;
     max-height: 50vh;
+    min-height: 120px;
     background: var(--ey-bg-card);
     border-top: 2px solid var(--ey-yellow);
     border-radius: 12px 12px 0 0;
     box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4);
     z-index: 200;
-    transition: transform 0.3s ease, max-height 0.3s ease;
+    transition: transform 0.3s ease;
     overflow: hidden;
     display: flex;
     flex-direction: column;
+}
+.employee-popout--resizing {
+    transition: none;
 }
 .employee-popout--closed {
     transform: translateY(100%);
@@ -1003,9 +1007,21 @@ body.page--landing .ey-logo-bottom {
 }
 .employee-popout--open.employee-popout--collapsed {
     max-height: 52px;
+    min-height: 52px;
 }
-.employee-popout--open.employee-popout--collapsed .employee-popout-inner {
+.employee-popout--open.employee-popout--collapsed .employee-popout-inner,
+.employee-popout--open.employee-popout--collapsed .employee-popout-resize {
     display: none;
+}
+.employee-popout-resize {
+    flex-shrink: 0;
+    height: 6px;
+    cursor: ns-resize;
+    background: var(--ey-border);
+    border-bottom: 1px solid var(--ey-border);
+}
+.employee-popout-resize:hover {
+    background: var(--ey-yellow);
 }
 .employee-popout-drag {
     flex-shrink: 0;
@@ -1029,11 +1045,78 @@ body.page--landing .ey-logo-bottom {
 .employee-popout-inner {
     position: relative;
     padding: 1.25rem 1.5rem 2rem;
-    max-height: calc(50vh - 52px);
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+.employee-popout-single {
+    flex: 1;
+    min-height: 0;
+}
+.employee-popout-compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+.employee-popout-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--ey-border);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    overflow: hidden;
+}
+.employee-popout-panel-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ey-yellow);
+    margin-bottom: 0.5rem;
+    flex-shrink: 0;
+}
+.employee-popout-panel .employee-popout-content {
+    font-size: 0.9rem;
     overflow-y: auto;
     flex: 1;
     min-height: 0;
 }
+.employee-popout-actions {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--ey-border);
+}
+.employee-popout-compare-btn,
+.employee-popout-back-single {
+    padding: 0.4rem 0.75rem;
+    background: var(--ey-bg-input);
+    border: 1px solid var(--ey-border);
+    border-radius: 6px;
+    color: var(--ey-text);
+    font-family: var(--font-ey);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+.employee-popout-compare-btn:hover,
+.employee-popout-back-single:hover {
+    border-color: var(--ey-yellow);
+    background: rgba(255, 230, 0, 0.1);
+    color: var(--ey-yellow);
+}
+.employee-popout-compare-hint {
+    font-size: 0.85rem;
+    color: var(--ey-text-muted);
+    margin: 0;
+}
+body[data-theme="light"] .employee-popout-panel-title { color: #000; border-bottom: 1px solid var(--ey-yellow); padding-bottom: 0.25rem; }
 .employee-popout-close {
     position: absolute;
     top: 0.5rem;

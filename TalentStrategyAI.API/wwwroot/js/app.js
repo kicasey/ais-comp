@@ -654,6 +654,20 @@ function setupManagerFlow() {
     var employeePopoutClose = document.getElementById('employee-popout-close');
     var employeePopoutTitle = document.getElementById('employee-popout-title');
     var employeePopoutContent = document.getElementById('employee-popout-content');
+    var employeePopoutSingle = document.getElementById('employee-popout-single');
+    var employeePopoutCompare = document.getElementById('employee-popout-compare');
+    var compareNameA = document.getElementById('employee-popout-compare-name-a');
+    var compareContentA = document.getElementById('employee-popout-compare-content-a');
+    var compareNameB = document.getElementById('employee-popout-compare-name-b');
+    var compareContentB = document.getElementById('employee-popout-compare-content-b');
+    var compareBtn = document.getElementById('employee-popout-compare-btn');
+    var backSingleBtn = document.getElementById('employee-popout-back-single');
+    var compareHint = document.getElementById('employee-popout-compare-hint');
+    var popoutResizeHandle = document.getElementById('employee-popout-resize');
+
+    var compareMode = false;
+    var firstEmployeeForCompare = null;
+    var popoutHeightPx = null;
 
     var selectedJobId = null;
     var selectedJobTitle = null;
@@ -740,7 +754,11 @@ function setupManagerFlow() {
                         var pct = emp.confidencePercent != null ? emp.confidencePercent : (emp.ConfidencePercent != null ? emp.ConfidencePercent : null);
                         card.innerHTML = '<span class="recommendation-card__name">' + escapeHtml(emp.name || emp.Name || '') + '</span><span class="recommendation-card__pct">' + (pct != null ? pct + '%' : '—') + '</span>';
                         card.addEventListener('click', function () {
-                            openEmployeePopout(emp.employeeId || emp.EmployeeId || '', emp.name || emp.Name || 'Employee');
+                            if (compareMode && firstEmployeeForCompare) {
+                                addSecondEmployeeForCompare(emp.employeeId || emp.EmployeeId || '', emp.name || emp.Name || 'Employee');
+                            } else {
+                                openEmployeePopout(emp.employeeId || emp.EmployeeId || '', emp.name || emp.Name || 'Employee');
+                            }
                         });
                         recommendationsListEl.appendChild(card);
                     });
@@ -762,12 +780,24 @@ function setupManagerFlow() {
         }
     }
 
+    function showSingleView() {
+        if (employeePopoutSingle) employeePopoutSingle.style.display = '';
+        if (employeePopoutCompare) employeePopoutCompare.style.display = 'none';
+        if (compareBtn) compareBtn.style.display = '';
+        if (backSingleBtn) backSingleBtn.style.display = 'none';
+        if (compareHint) compareHint.style.display = 'none';
+        compareMode = false;
+        firstEmployeeForCompare = null;
+    }
+
     function openEmployeePopout(employeeId, employeeName) {
+        showSingleView();
         employeePopoutTitle.textContent = 'Match explanation: ' + employeeName;
         employeePopoutContent.textContent = 'Loading AI explanation…';
         employeePopout.classList.remove('employee-popout--closed');
         employeePopout.classList.add('employee-popout--open');
         setPopoutCollapsed(false);
+        applyPopoutHeight();
 
         var popoutHeaders = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
         fetch('/api/chat', {
@@ -789,12 +819,110 @@ function setupManagerFlow() {
             });
     }
 
+    function addSecondEmployeeForCompare(employeeId, employeeName) {
+        if (!firstEmployeeForCompare) return;
+        compareContentB.textContent = 'Loading…';
+        compareNameA.textContent = firstEmployeeForCompare.name;
+        compareContentA.textContent = firstEmployeeForCompare.content;
+        compareNameB.textContent = employeeName;
+        employeePopoutSingle.style.display = 'none';
+        employeePopoutCompare.style.display = 'grid';
+        compareBtn.style.display = 'none';
+        backSingleBtn.style.display = '';
+        compareHint.style.display = 'none';
+
+        var popoutHeaders = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
+        fetch('/api/chat', {
+            method: 'POST',
+            headers: popoutHeaders,
+            body: JSON.stringify({
+                preset: 'explain_employee_match',
+                jobId: selectedJobId,
+                employeeId: employeeId
+            })
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                var text = (data && data.response) ? data.response : (data && data.message) ? data.message : 'No explanation available.';
+                compareContentB.textContent = text;
+            })
+            .catch(function () {
+                compareContentB.textContent = 'Could not load explanation.';
+            });
+        compareMode = false;
+        firstEmployeeForCompare = null;
+    }
+
+    function startCompareMode() {
+        compareMode = true;
+        firstEmployeeForCompare = {
+            id: null,
+            name: employeePopoutTitle.textContent.replace(/^Match explanation:\s*/i, ''),
+            content: employeePopoutContent.textContent
+        };
+        compareHint.style.display = 'block';
+        compareHint.textContent = 'Click another employee above to compare.';
+    }
+
     function closeEmployeePopout() {
         employeePopout.classList.add('employee-popout--closed');
         employeePopout.classList.remove('employee-popout--open');
         employeePopout.classList.remove('employee-popout--collapsed');
         if (popoutDragBtn) popoutDragBtn.textContent = '▼';
+        showSingleView();
+        if (employeePopout.style.height) employeePopout.style.height = '';
     }
+
+    function applyPopoutHeight() {
+        if (!employeePopout.classList.contains('employee-popout--open') || employeePopout.classList.contains('employee-popout--collapsed')) return;
+        if (popoutHeightPx != null) {
+            employeePopout.style.maxHeight = '';
+            employeePopout.style.height = popoutHeightPx + 'px';
+        } else {
+            employeePopout.style.height = '';
+            employeePopout.style.maxHeight = '50vh';
+        }
+    }
+
+    function setupPopoutResize() {
+        if (!popoutResizeHandle) return;
+        var minH = 120;
+        var maxH = Math.max(200, window.innerHeight * 0.9);
+
+        popoutResizeHandle.addEventListener('mousedown', function (e) {
+            if (!employeePopout.classList.contains('employee-popout--open') || employeePopout.classList.contains('employee-popout--collapsed')) return;
+            e.preventDefault();
+            var startY = e.clientY;
+            var startHeight = popoutHeightPx != null ? popoutHeightPx : Math.min(400, window.innerHeight * 0.5);
+            if (employeePopout.style.height) startHeight = parseInt(employeePopout.style.height, 10) || startHeight;
+            employeePopout.classList.add('employee-popout--resizing');
+
+            function onMove(e) {
+                var dy = startY - e.clientY;
+                var newH = Math.min(maxH, Math.max(minH, startHeight + dy));
+                popoutHeightPx = newH;
+                employeePopout.style.maxHeight = '';
+                employeePopout.style.height = newH + 'px';
+            }
+            function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                employeePopout.classList.remove('employee-popout--resizing');
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+    }
+
+    if (compareBtn) compareBtn.addEventListener('click', startCompareMode);
+    if (backSingleBtn) backSingleBtn.addEventListener('click', function () {
+        var name = compareNameA ? compareNameA.textContent : '';
+        var content = compareContentA ? compareContentA.textContent : '';
+        showSingleView();
+        employeePopoutTitle.textContent = 'Match explanation: ' + name;
+        employeePopoutContent.textContent = content;
+    });
+    setupPopoutResize();
 
     if (employeePopoutClose) employeePopoutClose.addEventListener('click', closeEmployeePopout);
     if (popoutDragBtn) {
@@ -802,6 +930,7 @@ function setupManagerFlow() {
             if (!employeePopout.classList.contains('employee-popout--open')) return;
             var collapsed = employeePopout.classList.toggle('employee-popout--collapsed');
             popoutDragBtn.textContent = collapsed ? '▲' : '▼';
+            if (!collapsed) applyPopoutHeight();
         });
     }
 }

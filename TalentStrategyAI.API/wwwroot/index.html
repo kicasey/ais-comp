@@ -193,11 +193,29 @@
                         </aside>
                     </div>
                     <div id="manager-employee-popout" class="employee-popout employee-popout--closed" aria-label="Employee match explanation">
+                        <div class="employee-popout-resize" id="employee-popout-resize" aria-label="Drag to resize"></div>
                         <button type="button" class="employee-popout-drag" id="employee-popout-drag" aria-label="Collapse or expand">▼</button>
                         <div class="employee-popout-inner">
                             <button type="button" class="employee-popout-close" id="employee-popout-close" aria-label="Close">×</button>
                             <h3 class="employee-popout-title" id="employee-popout-title">Match explanation</h3>
-                            <div id="employee-popout-content" class="employee-popout-content"></div>
+                            <div id="employee-popout-single" class="employee-popout-single">
+                                <div id="employee-popout-content" class="employee-popout-content"></div>
+                            </div>
+                            <div id="employee-popout-compare" class="employee-popout-compare" style="display: none;">
+                                <div class="employee-popout-panel">
+                                    <h4 class="employee-popout-panel-title" id="employee-popout-compare-name-a"></h4>
+                                    <div id="employee-popout-compare-content-a" class="employee-popout-content"></div>
+                                </div>
+                                <div class="employee-popout-panel">
+                                    <h4 class="employee-popout-panel-title" id="employee-popout-compare-name-b"></h4>
+                                    <div id="employee-popout-compare-content-b" class="employee-popout-content"></div>
+                                </div>
+                            </div>
+                            <div class="employee-popout-actions">
+                                <button type="button" class="employee-popout-compare-btn" id="employee-popout-compare-btn">Compare</button>
+                                <button type="button" class="employee-popout-back-single" id="employee-popout-back-single" style="display: none;">Back to single view</button>
+                                <p class="employee-popout-compare-hint" id="employee-popout-compare-hint" style="display: none;">Click another employee above to compare.</p>
+                            </div>
                         </div>
                     </div>
                     <section class="chat-section chat-section--manager" aria-label="AI assistant">
