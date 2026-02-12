@@ -56,11 +56,15 @@ docker save resume-api:latest | gzip > resume-api.tar.gz
 **Run on server** (set env vars for auth and webhook URLs; container listens on 8080):
 
 ```bash
-docker run -d --name resume-api -p 8080:8080 \
-  -e ClientAuth__ClientId="your-client-id" \
-  -e ClientAuth__ClientSecret="your-client-secret" \
-  -e Webhooks__Chat="http://192.168.1.161:5678/webhook/chat" \
-  -e Webhooks__Resumes="http://192.168.1.161:5678/webhook/resumes" \
+docker run -d --name resume-api \
+  --network resume_net \
+  -p 8080:8080 \
+  -v /mnt/cache/appdata/n8n-files/AIS-data/incoming-resumes:/data/incoming-resumes \
+  -e Webhooks__Chat="http://n8n:5678/webhook/chat" \
+  -e Webhooks__EmployeeChat="http://n8n:5678/webhook/employee-chat" \
+  -e Webhooks__Resumes="http://n8n:5678/webhook/resume-input" \
+  -e ConnectionStrings__ResumeDb="..." \
+  -e Gotenberg__BaseUrl="http://gotenberg:3000" \
   resume-api:latest
 ```
 
@@ -78,3 +82,20 @@ Expected schema (see `schema-jobs-mysql.sql`):
 - **job_recommendations**: `job_id`, `resume_id`, `score` (join to `resume_pii.resume_id` / `candidate_name` for names)
 
 If the connection string is missing or MySQL is down, jobs and recommendations endpoints return empty arrays.
+
+## Getting chat to work (n8n)
+
+Manager chat and “Explain match” go: **browser → TalentStrategyAI → resume-api → n8n**. Recommendations try resume-api chat first, then fall back to TalentStrategyAI `GET /api/jobs/{id}/recommendations` (MySQL/TestData).
+
+1. **Run n8n** so resume-api can reach it (e.g. same Docker network: `Webhooks__Chat="http://n8n:5678/webhook/chat"`, or LAN IP in appsettings).
+2. **Create a webhook workflow** in n8n:
+   - **Trigger:** Webhook, HTTP method POST, path `/webhook/chat` (so full URL is `http://<n8n-host>:5678/webhook/chat`).
+   - **Body:** JSON from the site, e.g. `preset`, `customText`, `jobId`, `employeeId`, `userEmail`, `userName`, `userId`.
+   - **Response:** Must return JSON with at least one of: `response`, `message`, `text`, or `content` (string). Example: `{ "response": "Here’s why this employee matches..." }`.
+3. **Recommendations (AI):** The “Recommend employees” button calls resume-api `/api/chat` with `preset: "recommend_for_job"`. To get AI-driven candidates, add a branch or second webhook in n8n that returns JSON like:
+   ```json
+   { "top_candidates": [ { "candidate_name": "Jane Doe", "resume_id": "r-1", "score": 92 } ] }
+   ```
+   If n8n doesn’t return that, the site falls back to **TalentStrategyAI** `GET /api/jobs/{jobId}/recommendations` (MySQL or sample data), so the list still fills.
+
+**Without n8n:** Manager chat still works: TalentStrategyAI returns a short fallback message. Recommendations show from MySQL or TestData via the fallback above.
