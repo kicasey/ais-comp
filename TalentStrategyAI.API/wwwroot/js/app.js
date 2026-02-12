@@ -458,7 +458,8 @@ function setupChatSendButtons() {
         var loadingId = 'loading-' + Date.now();
         appendChatMessage(messagesEl, 'Assistant', '…', 'assistant', true, loadingId);
         var headers = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
-        fetch(RESUME_API_BASE + endpoint, {
+        var chatUrl = (endpoint === '/api/chat') ? '/api/chat' : (RESUME_API_BASE + endpoint);
+        fetch(chatUrl, {
             method: 'POST',
             headers: headers,
             body: JSON.stringify(payload)
@@ -526,7 +527,8 @@ function sendPresetAndShowResponse(preset, messagesEl, chatEndpoint) {
     appendChatMessage(messagesEl, 'Assistant', '…', 'assistant', true, loadingId);
 
     var headers = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
-    fetch(RESUME_API_BASE + endpoint, {
+    var chatUrl = (endpoint === '/api/chat') ? '/api/chat' : (RESUME_API_BASE + endpoint);
+    fetch(chatUrl, {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(payload)
@@ -710,6 +712,28 @@ function setupManagerFlow() {
             recommendationsWrap.style.display = 'block';
             if (recommendationsJobTitle) recommendationsJobTitle.textContent = ' for "' + (selectedJobTitle || '') + '"';
             var recHeaders = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
+            function renderCandidates(candidates) {
+                if (!candidates || candidates.length === 0) {
+                    recommendationsListEl.innerHTML = '<p class="placeholder-text">No recommendations returned.</p>';
+                    return;
+                }
+                recommendationsListEl.innerHTML = '';
+                candidates.slice(0, 10).forEach(function (c) {
+                    var name = c.candidate_name || c.name || c.display || c.resume_id || c.employeeId || '';
+                    var empId = c.resume_id || c.employeeId || '';
+                    var pct = c.score != null ? c.score : (c.confidencePercent != null ? c.confidencePercent : null);
+                    var card = document.createElement('button');
+                    card.type = 'button';
+                    card.className = 'recommendation-card';
+                    card.setAttribute('data-employee-id', empId);
+                    card.setAttribute('data-employee-name', name);
+                    card.innerHTML = '<span class="recommendation-card__name">' + escapeHtml(name) + '</span><span class="recommendation-card__pct">' + (pct != null ? pct + '%' : '—') + '</span>';
+                    card.addEventListener('click', function () {
+                        openEmployeePopout(empId, name || 'Employee');
+                    });
+                    recommendationsListEl.appendChild(card);
+                });
+            }
             fetch(RESUME_API_BASE + '/api/chat', {
                 method: 'POST',
                 headers: recHeaders,
@@ -721,30 +745,23 @@ function setupManagerFlow() {
                 .then(function (res) { return res.ok ? res.json() : Promise.reject(new Error('Failed to load recommendations')); })
                 .then(function (data) {
                     var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
-                    var candidates = (item && item.top_candidates) ? item.top_candidates : [];
-                    if (candidates.length === 0) {
-                        recommendationsListEl.innerHTML = '<p class="placeholder-text">No recommendations returned.</p>';
+                    var candidates = (item && item.top_candidates) ? item.top_candidates : (Array.isArray(data) ? data : null);
+                    if (candidates && candidates.length > 0) {
+                        renderCandidates(candidates);
                         return;
                     }
-                    recommendationsListEl.innerHTML = '';
-                    candidates.slice(0, 3).forEach(function (c) {
-                        var name = c.candidate_name || c.display || c.resume_id || '';
-                        var empId = c.resume_id || '';
-                        var pct = c.score != null ? c.score : null;
-                        var card = document.createElement('button');
-                        card.type = 'button';
-                        card.className = 'recommendation-card';
-                        card.setAttribute('data-employee-id', empId);
-                        card.setAttribute('data-employee-name', name);
-                        card.innerHTML = '<span class="recommendation-card__name">' + escapeHtml(name) + '</span><span class="recommendation-card__pct">' + (pct != null ? pct + '%' : '—') + '</span>';
-                        card.addEventListener('click', function () {
-                            openEmployeePopout(empId, name || 'Employee');
-                        });
-                        recommendationsListEl.appendChild(card);
-                    });
+                    return fetch('/api/jobs/' + encodeURIComponent(selectedJobId) + '/recommendations', { headers: getAuthHeader() })
+                        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+                        .then(function (arr) { renderCandidates(Array.isArray(arr) ? arr : []); })
+                        .catch(function () { recommendationsListEl.innerHTML = '<p class="placeholder-text">No recommendations returned.</p>'; });
                 })
                 .catch(function () {
-                    recommendationsListEl.innerHTML = '<p class="placeholder-text">Could not load recommendations.</p>';
+                    fetch('/api/jobs/' + encodeURIComponent(selectedJobId) + '/recommendations', { headers: getAuthHeader() })
+                        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+                        .then(function (arr) { renderCandidates(Array.isArray(arr) ? arr : []); })
+                        .catch(function () {
+                            recommendationsListEl.innerHTML = '<p class="placeholder-text">Could not load recommendations.</p>';
+                        });
                 });
         });
     }
@@ -756,7 +773,7 @@ function setupManagerFlow() {
         employeePopout.classList.add('employee-popout--open');
 
         var popoutHeaders = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
-        fetch(RESUME_API_BASE + '/api/chat', {
+        fetch('/api/chat', {
             method: 'POST',
             headers: popoutHeaders,
             body: JSON.stringify({

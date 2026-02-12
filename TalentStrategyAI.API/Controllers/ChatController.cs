@@ -49,7 +49,10 @@ public class ChatController : ControllerBase
                     preset = request.Preset,
                     customText = request.CustomText,
                     jobId = request.JobId,
-                    employeeId = request.EmployeeId
+                    employeeId = request.EmployeeId,
+                    userEmail = request.UserEmail,
+                    userName = request.UserName,
+                    userId = request.UserId
                 };
                 var json = JsonSerializer.Serialize(payload);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -122,6 +125,9 @@ public class ChatController : ControllerBase
         public string? CustomText { get; set; }
         public string? JobId { get; set; }
         public string? EmployeeId { get; set; }
+        public string? UserEmail { get; set; }
+        public string? UserName { get; set; }
+        public string? UserId { get; set; }
     }
 
     public class ChatResponse
