@@ -552,7 +552,8 @@ function sendPresetAndShowResponse(preset, messagesEl, chatEndpoint) {
                 appendChatMessage(messagesEl, 'Assistant', structured, 'assistant', false, undefined, true);
             } else {
                 var text = (data && data.response) ? data.response : (data && data.message) ? data.message : (typeof data === 'string') ? data : 'Done.';
-                appendChatMessage(messagesEl, 'Assistant', text, 'assistant');
+                text = replaceIdsWithNames(text, data);
+                appendChatMessage(messagesEl, 'Assistant', fixSpacing(text), 'assistant');
             }
         })
         .catch(function (err) {
@@ -591,19 +592,63 @@ function formatResumeApiStructuredBlock(data) {
     if (!item || typeof item !== 'object') return null;
     var msg = item.assistant_message;
     var question = item.clarifying_question;
-    var candidates = item.top_candidates;
+
+    // Parse candidates from response text first (has proper spacing)
+    var candidates = null;
+    if (item.response) {
+        var raw = item.response;
+        raw = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
+        try {
+            var full = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+            if (full && full.top_candidates && full.top_candidates.length > 0) candidates = full.top_candidates;
+            if (!msg && full && full.assistant_message) msg = full.assistant_message;
+        } catch (e) {
+            var idx = raw.indexOf('"top_candidates"');
+            if (idx !== -1) {
+                var brace = raw.lastIndexOf('{', idx);
+                if (brace !== -1) {
+                    var depth = 0, endIdx = -1;
+                    for (var i = brace; i < raw.length; i++) {
+                        if (raw[i] === '{') depth++;
+                        else if (raw[i] === '}') { depth--; if (depth === 0) { endIdx = i + 1; break; } }
+                    }
+                    if (endIdx !== -1) {
+                        try {
+                            var parsed = JSON.parse(raw.substring(brace, endIdx));
+                            if (parsed.top_candidates && parsed.top_candidates.length > 0) candidates = parsed.top_candidates;
+                            if (!msg && parsed.assistant_message) msg = parsed.assistant_message;
+                        } catch (e2) {}
+                    }
+                }
+            }
+        }
+    }
+    // Fallback to top-level top_candidates
+    if ((!candidates || candidates.length === 0) && item.top_candidates) {
+        candidates = item.top_candidates;
+    }
+    // Enrich names from id_to_name
+    if (candidates && candidates.length > 0 && item.id_to_name) {
+        var nameMap = item.id_to_name;
+        for (var j = 0; j < candidates.length; j++) {
+            if (candidates[j].resume_id && nameMap[candidates[j].resume_id]) {
+                candidates[j].candidate_name = nameMap[candidates[j].resume_id];
+            }
+        }
+    }
+
     if (!msg && !question && (!candidates || !candidates.length)) return null;
     var html = '';
-    if (msg) html += '<p class="chat-structured__message">' + escapeHtml(msg) + '</p>';
-    if (question) html += '<p class="chat-structured__question"><strong>Clarifying:</strong> ' + escapeHtml(question) + '</p>';
+    if (msg) { msg = replaceIdsWithNames(msg, data); html += '<p class="chat-structured__message">' + escapeHtml(fixSpacing(msg)) + '</p>'; }
+    if (question) html += '<p class="chat-structured__question"><strong>Clarifying:</strong> ' + escapeHtml(fixSpacing(question)) + '</p>';
     if (candidates && candidates.length > 0) {
         html += '<div class="chat-structured__candidates"><strong>Top candidates</strong><ul>';
         for (var i = 0; i < candidates.length; i++) {
             var c = candidates[i];
             var name = (c.candidate_name || c.display || 'Unknown').toString();
             var score = c.score != null ? c.score + '%' : '';
-            var reason = (c.reason || '').toString().slice(0, 120);
-            if (reason.length === 120) reason += '…';
+            var reason = (c.reason || '').toString().slice(0, 150);
+            if (reason.length === 150) reason += '…';
             html += '<li><span class="chat-structured__name">' + escapeHtml(name) + '</span>' +
                 (score ? ' <span class="chat-structured__score">' + escapeHtml(score) + '</span>' : '') +
                 (reason ? ' — ' + escapeHtml(reason) : '') + '</li>';
@@ -622,6 +667,34 @@ function escapeHtml(s) {
     var div = document.createElement('div');
     div.textContent = s;
     return div.innerHTML;
+}
+
+// Replace resume UUIDs and "Candidate xxxx" placeholders with real names
+function replaceIdsWithNames(text, data) {
+    if (!text || !data) return text;
+    var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
+    var nameMap = item && item.id_to_name ? item.id_to_name : {};
+    for (var id in nameMap) {
+        if (nameMap.hasOwnProperty(id) && nameMap[id]) {
+            // Replace full UUID
+            text = text.split(id).join(nameMap[id]);
+            // Replace "Candidate xxxx" where xxxx is first 8 chars of the UUID
+            var short = id.substring(0, 8);
+            text = text.split('Candidate ' + short).join(nameMap[id]);
+        }
+    }
+    return text;
+}
+
+// Fix AI text that has no spaces (e.g. "DualmajorinMIS" -> "Dual major in MIS")
+function fixSpacing(text) {
+    if (!text) return '';
+    var s = text.replace(/([a-z])([A-Z])/g, '$1 $2');
+    s = s.replace(/([0-9])([A-Z])/g, '$1 $2');
+    s = s.replace(/([,.:;])([A-Za-z])/g, '$1 $2');
+    s = s.replace(/([a-z])(\d)/g, '$1 $2');
+    s = s.replace(/(\d)([a-z])/g, '$1 $2');
+    return s;
 }
 
 // ----- Manager flow: jobs list → job panel → recommend employees → employee popout (AI explanation) -----
@@ -740,13 +813,36 @@ function setupManagerFlow() {
                 });
             }
 
+            function generateUpskillSteps(gaps) {
+                if (!gaps || gaps.length === 0) return [];
+                return gaps.map(function (gap) {
+                    var lower = gap.toLowerCase();
+                    if (lower.indexOf('cpa') !== -1 || lower.indexOf('accounting') !== -1 || lower.indexOf('audit') !== -1)
+                        return { step: 'CPA Certification Prep', desc: 'Enroll in a CPA review course (e.g., Becker, Roger CPA) to build accounting and audit foundations.' };
+                    if (lower.indexOf('experience') !== -1 || lower.indexOf('years') !== -1 || lower.indexOf('professional') !== -1)
+                        return { step: 'Mentorship & On-the-Job Training', desc: 'Pair with a senior team member for hands-on project exposure and accelerated skill development.' };
+                    if (lower.indexOf('certif') !== -1)
+                        return { step: 'Professional Certification', desc: 'Pursue relevant industry certifications to validate skills and close credentialing gaps.' };
+                    if (lower.indexOf('consult') !== -1 || lower.indexOf('client') !== -1 || lower.indexOf('advisory') !== -1)
+                        return { step: 'Consulting Skills Workshop', desc: 'Complete a consulting methodology or client advisory training program.' };
+                    if (lower.indexOf('gaap') !== -1 || lower.indexOf('ifrs') !== -1 || lower.indexOf('sox') !== -1 || lower.indexOf('pcaob') !== -1 || lower.indexOf('coso') !== -1)
+                        return { step: 'Regulatory & Standards Training', desc: 'Take courses on GAAP, IFRS, SOX, PCAOB, or COSO frameworks as applicable.' };
+                    if (lower.indexOf('leadership') !== -1 || lower.indexOf('manage') !== -1)
+                        return { step: 'Leadership Development Program', desc: 'Join an internal or external leadership development cohort to build management capabilities.' };
+                    if (lower.indexOf('technology') !== -1 || lower.indexOf('technical') !== -1 || lower.indexOf('software') !== -1 || lower.indexOf('coding') !== -1)
+                        return { step: 'Technical Skills Bootcamp', desc: 'Complete targeted training in the specific technologies required for the role.' };
+                    if (lower.indexOf('communication') !== -1 || lower.indexOf('presentation') !== -1)
+                        return { step: 'Communication & Presentation Training', desc: 'Take a business communication or public speaking course to strengthen soft skills.' };
+                    return { step: 'Targeted Training: ' + gap.substring(0, 50), desc: 'Complete relevant EY learning modules or external courses to address this gap.' };
+                });
+            }
+
             function openCandidateDetail(c, name) {
                 var empId = c.resume_id || c.employeeId || '';
                 var pct = c.score != null ? c.score : (c.confidencePercent != null ? c.confidencePercent : null);
-                var strengths = c.strengths || [];
-                var gaps = c.gaps || [];
-                var reason = c.reason || '';
-                var plan = c.upskilling_plan || [];
+                var strengths = (c.strengths || []).map(fixSpacing);
+                var gaps = (c.gaps || []).map(fixSpacing);
+                var reason = fixSpacing(c.reason || '');
 
                 var html = '<h3 style="margin:0 0 0.25rem;color:var(--ey-yellow)">' + escapeHtml(name) + '</h3>';
                 if (pct != null) html += '<p style="margin:0 0 0.75rem;font-size:0.9rem;color:#9ca3af">Match score: <strong style="color:var(--ey-yellow)">' + pct + '%</strong></p>';
@@ -762,20 +858,21 @@ function setupManagerFlow() {
                     html += '</ul>';
                 }
 
-                // Upskilling plan — already included in the candidate data from the original AI call
+                // Upskilling plan — generated from gaps, no AI call needed
+                var steps = generateUpskillSteps(gaps);
                 html += '<div style="margin-top:1rem;border-top:1px solid var(--ey-border);padding-top:0.75rem">';
                 html += '<p style="margin:0 0 0.5rem;font-weight:600;color:var(--ey-yellow)">Upskilling Plan</p>';
-                if (plan.length > 0) {
+                if (steps.length > 0) {
                     html += '<ol style="margin:0;padding-left:1.25rem;color:#e5e7eb">';
-                    plan.forEach(function (s) {
+                    steps.forEach(function (s) {
                         html += '<li style="margin-bottom:0.5rem;line-height:1.4">';
-                        html += '<strong style="color:var(--ey-yellow)">' + escapeHtml(s.step || s.title || '') + '</strong>';
-                        if (s.description) html += '<br><span style="font-size:0.82rem;color:#d1d5db">' + escapeHtml(s.description) + '</span>';
+                        html += '<strong style="color:var(--ey-yellow)">' + escapeHtml(s.step) + '</strong>';
+                        html += '<br><span style="font-size:0.82rem;color:#d1d5db">' + escapeHtml(s.desc) + '</span>';
                         html += '</li>';
                     });
                     html += '</ol>';
                 } else {
-                    html += '<p style="color:#9ca3af;font-size:0.85rem">No upskilling plan available.</p>';
+                    html += '<p style="color:#9ca3af;font-size:0.85rem">No gaps identified — candidate is well-suited for this role.</p>';
                 }
                 html += '</div>';
 
@@ -789,22 +886,22 @@ function setupManagerFlow() {
                 headers: recHeaders,
                 body: JSON.stringify({
                     preset: 'recommend_for_job',
-                    customText: 'INSTRUCTION: You must match every candidate in the database to the job titled "' + (selectedJobTitle || selectedJobId) + '". Score each candidate 0-100 based on how well their skills and experience fit this role. For each candidate, also provide a practical upskilling plan with 3-5 specific courses, certifications, or training activities to close their gaps for this role. Do NOT ask clarifying questions. Do NOT explain. Respond with ONLY this JSON, nothing else: {"top_candidates":[{"candidate_name":"Full Name","resume_id":"the-resume-id","score":85,"strengths":["strength1"],"gaps":["gap1"],"reason":"why they match or dont","upskilling_plan":[{"step":"Step title","description":"What to do and why"}]}]}. Include ALL candidates, ranked by score descending.'
+                    customText: 'INSTRUCTION: You must match every candidate in the database to the job titled "' + (selectedJobTitle || selectedJobId) + '". Score each candidate 0-100 based on how well their skills and experience fit this role. Do NOT ask clarifying questions. Do NOT explain. Use normal English with proper spacing in all text fields. Respond with ONLY this JSON, nothing else: {"top_candidates":[{"candidate_name":"Full Name","resume_id":"the-resume-id","score":85,"strengths":["strength 1"],"gaps":["gap 1"],"reason":"why they match or dont"}]}. Include ALL candidates, ranked by score descending.'
                 })
             })
                 .then(function (res) { return res.ok ? res.json() : Promise.reject(new Error('Failed to load recommendations')); })
                 .then(function (data) {
                     var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
-                    var candidates = (item && item.top_candidates) ? item.top_candidates : null;
-                    // If no structured candidates, try parsing JSON from the response text
-                    if ((!candidates || candidates.length === 0) && item && item.response) {
+                    var candidates = null;
+                    // Always try parsing from the response text first — it preserves proper spacing
+                    if (item && item.response) {
                         var raw = item.response;
                         // Strip markdown code fences
                         raw = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
                         // Try parsing the whole response as JSON first
                         try {
                             var full = (typeof raw === 'string') ? JSON.parse(raw) : raw;
-                            if (full && full.top_candidates) candidates = full.top_candidates;
+                            if (full && full.top_candidates && full.top_candidates.length > 0) candidates = full.top_candidates;
                         } catch (e) { /* not pure JSON */ }
                         // Try extracting JSON object containing top_candidates
                         if (!candidates || candidates.length === 0) {
@@ -821,12 +918,26 @@ function setupManagerFlow() {
                                         }
                                         if (endIdx !== -1) {
                                             var parsed = JSON.parse(raw.substring(brace, endIdx));
-                                            if (parsed.top_candidates) candidates = parsed.top_candidates;
+                                            if (parsed.top_candidates && parsed.top_candidates.length > 0) candidates = parsed.top_candidates;
                                         }
                                     }
                                 }
                             } catch (e) { /* give up */ }
                         }
+                    }
+                    // Fallback to top-level top_candidates if response parsing didn't work
+                    if ((!candidates || candidates.length === 0) && item && item.top_candidates) {
+                        candidates = item.top_candidates;
+                    }
+                    // Enrich with real names from id_to_name (AI uses placeholder names like "Candidate 20a9fda3")
+                    if (candidates && candidates.length > 0 && item && item.id_to_name) {
+                        var nameMap = item.id_to_name;
+                        candidates = candidates.map(function (c) {
+                            if (c.resume_id && nameMap[c.resume_id]) {
+                                c.candidate_name = nameMap[c.resume_id];
+                            }
+                            return c;
+                        });
                     }
                     if (candidates && candidates.length > 0) {
                         renderCandidates(candidates);

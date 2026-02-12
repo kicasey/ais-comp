@@ -64,7 +64,7 @@ public class ChatController : ControllerBase
                 if (response.IsSuccessStatusCode)
                 {
                     var body = await response.Content.ReadAsStringAsync();
-                    _logger.LogInformation("Resume API response body (first 500 chars): {Body}", body?.Length > 500 ? body[..500] : body);
+                    _logger.LogInformation("Resume API response body (first 2000 chars): {Body}", body?.Length > 2000 ? body[..2000] : body);
                     if (!string.IsNullOrEmpty(body))
                     {
                         // Pass through the raw JSON so structured data (top_candidates, etc.) is preserved
