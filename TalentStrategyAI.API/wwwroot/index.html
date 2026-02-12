@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/styles.css?v=3">
 </head>
 <body class="page--landing">
     <!-- EY logo: top right on landing only -->
@@ -15,15 +15,14 @@
         <img src="images/ey-logo.svg" alt="EY" class="ey-logo-img">
     </div>
 
-    <!-- Landing page -->
+    <!-- Landing page: Log in → choose Employee or Manager -->
     <section class="page page--landing" id="page-landing">
         <header class="landing-header">
             <h1 class="landing-title">TalentStrategyAI</h1>
             <p class="landing-tagline">EY Talent Match — match talent to roles, fairly and clearly.</p>
-            <button type="button" class="btn-login btn-login--landing" id="btn-login" aria-label="Login">Login</button>
+            <p class="landing-cta">Log in as</p>
         </header>
         <div class="landing-choices">
-            <p class="landing-prompt">I am...</p>
             <div class="landing-buttons">
                 <button type="button" class="landing-card" id="go-employee" data-role="employee">
                     <span class="landing-card__icon" aria-hidden="true">👤</span>
@@ -37,10 +36,56 @@
                 </button>
             </div>
         </div>
-        <a href="#" class="back-to-landing" id="back-to-landing" style="display: none;">← Back to home</a>
     </section>
 
-    <!-- App: Employee or Manager (hidden until chosen from landing) -->
+    <!-- Login page: clean sign-in only (Create profile toggles in) -->
+    <section class="page page--login page--hidden" id="page-login">
+        <a href="#" class="login-back" id="login-back" style="color:#FFE600;">← Back</a>
+        <div class="login-center">
+            <div class="login-card" style="background:#fafafa; border-radius:20px; box-shadow:0 4px 6px rgba(0,0,0,0.04), 0 12px 24px rgba(0,0,0,0.06), 0 24px 48px rgba(255,230,0,0.14), 0 0 0 1px rgba(255,230,0,0.08); border:1px solid rgba(0,0,0,0.06); padding:2.5rem 2rem;">
+                <div class="login-card-header">
+                    <img src="images/ey-logo.svg" alt="EY" class="login-logo">
+                    <h1 class="login-heading" id="login-page-title" style="color:#1a1a1a;">Manager sign in</h1>
+                    <p class="login-description" id="login-page-subtitle" style="color:#6b7280;">Sign in to view jobs and recommendations.</p>
+                </div>
+
+                <form id="auth-login-form" class="auth-form auth-form--signin">
+                    <label for="login-email" class="auth-label" style="color:#374151;">Email</label>
+                    <input type="email" id="login-email" name="email" required placeholder="you@ey.com" autocomplete="email" class="auth-input" style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; color:#1a1a1a;">
+                    <label for="login-password" class="auth-label" style="color:#374151;">Password</label>
+                    <input type="password" id="login-password" name="password" required placeholder="Enter password" autocomplete="current-password" class="auth-input" style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; color:#1a1a1a;">
+                    <p id="auth-login-error" class="auth-error" role="alert" aria-live="polite"></p>
+                    <button type="submit" class="auth-btn" style="background:#FFE600; color:#000; border-radius:10px;">Sign in</button>
+                    <p class="auth-footer" style="color:#6b7280;">Don't have an account? <button type="button" class="auth-footer-link" id="auth-show-register" style="color:#b45309;">Create profile</button></p>
+                </form>
+
+                <form id="auth-register-form" class="auth-form auth-form--register auth-form--hidden">
+                    <label for="register-email" class="auth-label" style="color:#374151;">Email</label>
+                    <input type="email" id="register-email" name="email" required placeholder="you@ey.com" autocomplete="email" class="auth-input" style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; color:#1a1a1a;">
+                    <label for="register-password" class="auth-label" style="color:#374151;">Password</label>
+                    <input type="password" id="register-password" name="password" required placeholder="At least 6 characters" autocomplete="new-password" minlength="6" class="auth-input" style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; color:#1a1a1a;">
+                    <label for="register-display-name" class="auth-label" style="color:#374151;">Display name</label>
+                    <input type="text" id="register-display-name" name="displayName" placeholder="Your name" autocomplete="name" class="auth-input" style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; color:#1a1a1a;">
+                    <label for="register-role" class="auth-label" style="color:#374151;">I am</label>
+                    <select id="register-role" name="role" class="auth-input" style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; color:#1a1a1a;">
+                        <option value="employee">Employee</option>
+                        <option value="manager">Manager</option>
+                    </select>
+                    <div class="auth-register-extra" id="register-employee-fields">
+                        <label for="register-position" class="auth-label" style="color:#374151;">Position</label>
+                        <input type="text" id="register-position" name="position" placeholder="e.g. Consultant" class="auth-input" style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; color:#1a1a1a;">
+                        <label for="register-department" class="auth-label" style="color:#374151;">Department</label>
+                        <input type="text" id="register-department" name="department" placeholder="e.g. Technology" class="auth-input" style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; color:#1a1a1a;">
+                    </div>
+                    <p id="auth-register-error" class="auth-error" role="alert" aria-live="polite"></p>
+                    <button type="submit" class="auth-btn" style="background:#FFE600; color:#000; border-radius:10px;">Create profile</button>
+                    <p class="auth-footer" style="color:#6b7280;">Already have an account? <button type="button" class="auth-footer-link" id="auth-show-login" style="color:#b45309;">Sign in</button></p>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- App: Employee or Manager (after successful login) -->
     <section class="page page--app page--hidden" id="page-app">
         <header class="app-header">
             <button type="button" class="btn-back" id="btn-back" aria-label="Back to home">← Back</button>
@@ -48,7 +93,11 @@
                 <div class="logo">TalentStrategyAI</div>
                 <p class="tagline">EY Talent Match</p>
             </div>
-            <button type="button" class="btn-login" id="btn-login-app" aria-label="Login">Login</button>
+            <div class="header-auth">
+                <span class="header-user" id="header-user" style="display: none;"></span>
+                <button type="button" class="btn-login" id="btn-login-app" aria-label="Login">Login</button>
+                <button type="button" class="btn-logout" id="btn-logout" aria-label="Log out" style="display: none;">Log out</button>
+            </div>
         </header>
 
         <div class="app-container">
@@ -104,7 +153,31 @@
 
                 <!-- ========== MANAGER INTERFACE ========== -->
                 <section class="interface interface--hidden" id="interface-manager" aria-label="Manager interface">
-                    <section class="chat-section" aria-label="AI assistant">
+                    <div class="manager-layout">
+                        <div class="manager-main">
+                            <h2 class="section-title">Open job postings</h2>
+                            <div id="manager-jobs-list" class="jobs-list" aria-live="polite"><p class="placeholder-text">Loading job postings…</p></div>
+                            <div id="manager-recommendations-wrap" class="recommendations-wrap" style="display: none;">
+                                <h2 class="section-title">Recommended employees <span id="manager-recommendations-job-title" class="section-title-sub"></span></h2>
+                                <div id="manager-recommendations-list" class="recommendations-list" aria-live="polite"></div>
+                            </div>
+                        </div>
+                        <aside id="manager-job-panel" class="manager-panel manager-panel--closed" aria-label="Job details">
+                            <div class="manager-panel-inner">
+                                <button type="button" class="manager-panel-close" id="manager-panel-close" aria-label="Close panel">×</button>
+                                <div id="manager-job-detail" class="manager-job-detail"></div>
+                                <button type="button" class="btn-recommend-employees" id="btn-recommend-employees">Recommend employees</button>
+                            </div>
+                        </aside>
+                    </div>
+                    <div id="manager-employee-popout" class="employee-popout employee-popout--closed" aria-label="Employee match explanation">
+                        <div class="employee-popout-inner">
+                            <button type="button" class="employee-popout-close" id="employee-popout-close" aria-label="Close">×</button>
+                            <h3 class="employee-popout-title" id="employee-popout-title">Match explanation</h3>
+                            <div id="employee-popout-content" class="employee-popout-content"></div>
+                        </div>
+                    </div>
+                    <section class="chat-section chat-section--manager" aria-label="AI assistant">
                         <h2 class="section-title">Ask EY's Talent Manager</h2>
                         <div class="chat-messages" id="chat-messages-manager" aria-live="polite"></div>
                         <div class="chat-input-row">
@@ -120,12 +193,6 @@
                             </div>
                         </div>
                     </section>
-                    <section class="match-section" aria-label="Top employees for role">
-                        <h2 class="section-title">Top employees for a role</h2>
-                        <div id="manager-match-list" class="match-list" aria-live="polite">
-                            <p class="placeholder-text">Use the assistant above to see employees ranked by match % for a role.</p>
-                        </div>
-                    </section>
                 </section>
             </main>
         </div>
@@ -136,6 +203,6 @@
         <img src="images/ey-logo.svg" alt="EY" class="ey-logo-img">
     </div>
 
-    <script src="js/app.js"></script>
+    <script src="js/app.js?v=2"></script>
 </body>
 </html>

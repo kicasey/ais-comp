@@ -1,0 +1,40 @@
+{
+  "description": "Metadata and short summaries for sample resumes. Use with sample-employees.json. Resume files can be placeholder PDFs/DOCX or real uploads.",
+  "resumes": [
+    {
+      "employeeId": "emp-1",
+      "candidateName": "Alex Chen",
+      "fileName": "alex-chen-resume.pdf",
+      "uploadedAt": "2025-01-15",
+      "summary": "Technology Consultant with 3 years at EY. Experience in cloud advisory, data analytics, and client delivery. Skills: Python, SQL, Azure, project management."
+    },
+    {
+      "employeeId": "emp-2",
+      "candidateName": "Jordan Smith",
+      "fileName": "jordan-smith-resume.docx",
+      "uploadedAt": "2025-01-10",
+      "summary": "Assurance Staff, 5 years. CPA. Focus on financial statement audits and internal controls. Industries: financial services, healthcare."
+    },
+    {
+      "employeeId": "emp-3",
+      "candidateName": "Sam Williams",
+      "fileName": "sam-williams-resume.pdf",
+      "uploadedAt": "2025-01-12",
+      "summary": "Tax Senior Staff, 4 years. Corporate tax compliance and provision. Experience with multinational clients and tax technology tools."
+    },
+    {
+      "employeeId": "emp-4",
+      "candidateName": "Casey Brown",
+      "fileName": "casey-brown-resume.pdf",
+      "uploadedAt": "2025-01-08",
+      "summary": "Consulting Analyst, 2 years. Strategy and operations. Analytics, process improvement, and client workshops."
+    },
+    {
+      "employeeId": "emp-5",
+      "candidateName": "Morgan Lee",
+      "fileName": "morgan-lee-resume.docx",
+      "uploadedAt": "2025-01-18",
+      "summary": "Technology Consultant, 1 year. Software development and integration. Skills: C#, .NET, APIs, agile."
+    }
+  ]
+}

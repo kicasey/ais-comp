@@ -1,0 +1,40 @@
+{
+  "description": "Open job postings for testing the manager flow (list jobs, view detail, recommend employees).",
+  "jobs": [
+    {
+      "id": "job-1",
+      "title": "Senior Consultant – Technology",
+      "department": "Technology",
+      "location": "New York",
+      "description": "Lead technology advisory engagements. Requires 3+ years experience, strong client communication, and technical delivery skills. Preferred: cloud (Azure/AWS), data analytics, or integration experience."
+    },
+    {
+      "id": "job-2",
+      "title": "Manager – Assurance",
+      "department": "Assurance",
+      "location": "Chicago",
+      "description": "Manage assurance teams and engagements. CPA or equivalent, 5+ years in assurance preferred. Experience with financial services or public company audits a plus."
+    },
+    {
+      "id": "job-3",
+      "title": "Staff – Tax",
+      "department": "Tax",
+      "location": "Dallas",
+      "description": "Support tax compliance and advisory. Bachelor's in accounting or related; CPA track preferred. Strong Excel and attention to detail."
+    },
+    {
+      "id": "job-4",
+      "title": "Senior Analyst – Consulting",
+      "department": "Consulting",
+      "location": "Remote",
+      "description": "Deliver consulting analyses and client deliverables. Strong analytical and presentation skills required. 2+ years in strategy, operations, or analytics preferred."
+    },
+    {
+      "id": "job-5",
+      "title": "Technology Consultant – Data & Analytics",
+      "department": "Technology",
+      "location": "New York",
+      "description": "Data and analytics advisory. Python, SQL, visualization tools (Power BI, Tableau). 1–3 years experience in data or analytics roles."
+    }
+  ]
+}

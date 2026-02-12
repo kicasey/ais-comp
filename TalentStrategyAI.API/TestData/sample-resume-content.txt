@@ -1,0 +1,67 @@
+# Sample resume content snippets (for AI/matching tests)
+# Use these when testing resume parsing or match logic. Each block is one person.
+
+--- Alex Chen ---
+ALEX CHEN
+Technology Consultant, EY | New York
+alex.chen@ey.com | 3 years at EY
+
+EXPERIENCE
+- Technology Advisory: cloud migration, data analytics, client delivery
+- Skills: Python, SQL, Azure, project management, agile
+- Led 2 client engagements; supported 5+ advisory projects
+
+EDUCATION
+BS Computer Science, State University
+
+--- Jordan Smith ---
+JORDAN SMITH
+Assurance Staff, EY | Chicago
+jordan.smith@ey.com | 5 years at EY | CPA
+
+EXPERIENCE
+- Financial statement audits, internal controls, SOX
+- Industries: financial services, healthcare
+- Senior on 3 audit engagements
+
+EDUCATION
+BS Accounting, CPA
+
+--- Sam Williams ---
+SAM WILLIAMS
+Tax Senior Staff, EY | Dallas
+sam.williams@ey.com | 4 years at EY
+
+EXPERIENCE
+- Corporate tax compliance, provision, multinational clients
+- Tax technology tools and process improvement
+- Focus: C-Corp and pass-through entities
+
+EDUCATION
+BS Accounting, MST
+
+--- Casey Brown ---
+CASEY BROWN
+Consulting Analyst, EY | Remote
+casey.brown@ey.com | 2 years at EY
+
+EXPERIENCE
+- Strategy and operations; analytics and process improvement
+- Client workshops and deliverables
+- Skills: Excel, Power BI, project coordination
+
+EDUCATION
+BA Economics, Business minor
+
+--- Morgan Lee ---
+MORGAN LEE
+Technology Consultant, EY | New York
+morgan.lee@ey.com | 1 year at EY
+
+EXPERIENCE
+- Software development and integration; C#, .NET, APIs
+- Agile delivery; unit testing and documentation
+- Supported 2 technology implementation projects
+
+EDUCATION
+BS Software Engineering

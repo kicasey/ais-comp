@@ -1,0 +1,27 @@
+{
+  "description": "Precomputed employee–job match recommendations (confidence %) for testing. jobId -> list of recommended employees.",
+  "recommendationsByJob": {
+    "job-1": [
+      { "employeeId": "emp-1", "name": "Alex Chen", "confidencePercent": 92 },
+      { "employeeId": "emp-5", "name": "Morgan Lee", "confidencePercent": 85 },
+      { "employeeId": "emp-4", "name": "Casey Brown", "confidencePercent": 68 }
+    ],
+    "job-2": [
+      { "employeeId": "emp-2", "name": "Jordan Smith", "confidencePercent": 94 },
+      { "employeeId": "emp-3", "name": "Sam Williams", "confidencePercent": 72 }
+    ],
+    "job-3": [
+      { "employeeId": "emp-3", "name": "Sam Williams", "confidencePercent": 88 },
+      { "employeeId": "emp-2", "name": "Jordan Smith", "confidencePercent": 65 }
+    ],
+    "job-4": [
+      { "employeeId": "emp-4", "name": "Casey Brown", "confidencePercent": 90 },
+      { "employeeId": "emp-1", "name": "Alex Chen", "confidencePercent": 75 },
+      { "employeeId": "emp-2", "name": "Jordan Smith", "confidencePercent": 60 }
+    ],
+    "job-5": [
+      { "employeeId": "emp-5", "name": "Morgan Lee", "confidencePercent": 87 },
+      { "employeeId": "emp-1", "name": "Alex Chen", "confidencePercent": 82 }
+    ]
+  }
+}

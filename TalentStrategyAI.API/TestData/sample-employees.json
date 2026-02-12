@@ -1,0 +1,55 @@
+{
+  "description": "Sample employee profiles for seeding the database or testing the employee interface.",
+  "employees": [
+    {
+      "id": "emp-1",
+      "name": "Alex Chen",
+      "email": "alex.chen@ey.com",
+      "position": "Consultant",
+      "department": "Technology",
+      "location": "New York",
+      "yearsAtEY": 3,
+      "resumeFileName": "alex-chen-resume.pdf"
+    },
+    {
+      "id": "emp-2",
+      "name": "Jordan Smith",
+      "email": "jordan.smith@ey.com",
+      "position": "Staff",
+      "department": "Assurance",
+      "location": "Chicago",
+      "yearsAtEY": 5,
+      "resumeFileName": "jordan-smith-resume.docx"
+    },
+    {
+      "id": "emp-3",
+      "name": "Sam Williams",
+      "email": "sam.williams@ey.com",
+      "position": "Senior Staff",
+      "department": "Tax",
+      "location": "Dallas",
+      "yearsAtEY": 4,
+      "resumeFileName": "sam-williams-resume.pdf"
+    },
+    {
+      "id": "emp-4",
+      "name": "Casey Brown",
+      "email": "casey.brown@ey.com",
+      "position": "Analyst",
+      "department": "Consulting",
+      "location": "Remote",
+      "yearsAtEY": 2,
+      "resumeFileName": "casey-brown-resume.pdf"
+    },
+    {
+      "id": "emp-5",
+      "name": "Morgan Lee",
+      "email": "morgan.lee@ey.com",
+      "position": "Consultant",
+      "department": "Technology",
+      "location": "New York",
+      "yearsAtEY": 1,
+      "resumeFileName": "morgan-lee-resume.docx"
+    }
+  ]
+}

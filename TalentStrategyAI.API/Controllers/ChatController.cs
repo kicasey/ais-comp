@@ -1,46 +1,127 @@
+using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 
 namespace TalentStrategyAI.API.Controllers;
 
 /// <summary>
-/// Chat API for AI assistant. Frontend sends preset actions (e.g. match_roles, match_summary).
-/// This controller will proxy requests to resume-api.campbellthompson.com (which handles SQL + AI).
-/// For now returns a stub response so the UI works until the integration is wired.
+/// Chat API for AI assistant. Proxies to resume-api.campbellthompson.com when configured.
+/// If the API is unavailable or returns an error, returns a fallback message so the UI still works.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class ChatController : ControllerBase
 {
     private readonly ILogger<ChatController> _logger;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IConfiguration _configuration;
 
-    public ChatController(ILogger<ChatController> logger)
+    public ChatController(
+        ILogger<ChatController> logger,
+        IHttpClientFactory httpClientFactory,
+        IConfiguration configuration)
     {
         _logger = logger;
+        _httpClientFactory = httpClientFactory;
+        _configuration = configuration;
     }
 
     [HttpPost]
-    public IActionResult Post([FromBody] ChatRequest request)
+    public async Task<IActionResult> Post([FromBody] ChatRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request?.Preset))
+        if (string.IsNullOrWhiteSpace(request?.Preset) && string.IsNullOrWhiteSpace(request?.CustomText))
         {
-            return BadRequest(new { message = "Preset is required." });
+            return BadRequest(new { message = "Preset or CustomText is required." });
         }
 
-        _logger.LogInformation("Chat preset requested: {Preset}", request.Preset);
+        _logger.LogInformation("Chat preset: {Preset}, JobId: {JobId}, EmployeeId: {EmployeeId}", request.Preset, request.JobId, request.EmployeeId);
 
-        // Stub: replace with call to resume-api.campbellthompson.com when ready.
-        // That API handles SQL and AI together (jobs, matches, explanations, upskilling, bias).
-        var response = new ChatResponse
+        var baseUrl = _configuration["ResumeApi:BaseUrl"];
+        var chatPath = _configuration["ResumeApi:ChatPath"] ?? "api/chat";
+
+        if (!string.IsNullOrWhiteSpace(baseUrl))
         {
-            Response = "This response is a placeholder. Connect this endpoint to resume-api.campbellthompson.com to return real AI and match data from SQL."
-        };
+            try
+            {
+                var client = _httpClientFactory.CreateClient("ResumeApi");
+                var payload = new
+                {
+                    preset = request.Preset,
+                    customText = request.CustomText,
+                    jobId = request.JobId,
+                    employeeId = request.EmployeeId
+                };
+                var json = JsonSerializer.Serialize(payload);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        return Ok(response);
+                var path = chatPath.TrimStart('/');
+                var response = await client.PostAsync(path, content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    var responseText = TryParseResponseText(body);
+                    if (!string.IsNullOrEmpty(responseText))
+                    {
+                        return Ok(new ChatResponse { Response = responseText });
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Resume API returned {StatusCode} for chat", response.StatusCode);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Resume API chat call failed");
+            }
+        }
+
+        var fallback = GetFallbackResponse(request);
+        return Ok(new ChatResponse { Response = fallback });
+    }
+
+    private static string GetFallbackResponse(ChatRequest request)
+    {
+        if (string.Equals(request.Preset, "explain_employee_match", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(request.JobId)
+            && !string.IsNullOrWhiteSpace(request.EmployeeId))
+        {
+            return "**Match explanation (demo)**\n\nThis employee is a strong match for this role based on skills and experience in our database. " +
+                   "When the resume-api is connected, AI will provide a detailed explanation of strengths and gaps.\n\n" +
+                   "**Upskilling suggestions:**\n• Complete relevant EY learning modules for the role.\n• Shadow a current team member in this function.\n• Consider certification or training in key areas identified in the job description.";
+        }
+        return "The AI assistant could not be reached. Check that ResumeApi:BaseUrl points to resume-api.campbellthompson.com and that the API is running. You can also check the server logs for details.";
+    }
+
+    private static string? TryParseResponseText(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            foreach (var key in new[] { "response", "message", "text", "content" })
+            {
+                if (root.TryGetProperty(key, out var prop) && prop.ValueKind == JsonValueKind.String)
+                {
+                    var s = prop.GetString();
+                    if (!string.IsNullOrWhiteSpace(s)) return s;
+                }
+            }
+            return root.GetString();
+        }
+        catch
+        {
+            return json;
+        }
     }
 
     public class ChatRequest
     {
         public string? Preset { get; set; }
+        public string? CustomText { get; set; }
+        public string? JobId { get; set; }
+        public string? EmployeeId { get; set; }
     }
 
     public class ChatResponse

@@ -1,0 +1,21 @@
+{
+  "description": "Sample manager profiles for testing the manager interface and permissions.",
+  "managers": [
+    {
+      "id": "mgr-1",
+      "name": "Taylor Johnson",
+      "email": "taylor.johnson@ey.com",
+      "department": "Technology",
+      "location": "New York",
+      "directReports": ["emp-1", "emp-5"]
+    },
+    {
+      "id": "mgr-2",
+      "name": "Riley Davis",
+      "email": "riley.davis@ey.com",
+      "department": "Assurance",
+      "location": "Chicago",
+      "directReports": ["emp-2", "emp-3", "emp-4"]
+    }
+  ]
+}

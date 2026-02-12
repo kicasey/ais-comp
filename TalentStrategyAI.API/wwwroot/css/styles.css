@@ -36,7 +36,8 @@ body {
     right: 1rem;
     z-index: 100;
 }
-body.page--app .ey-logo-top {
+body.page--app .ey-logo-top,
+body.page--login .ey-logo-top {
     display: none;
 }
 /* ----- EY logo: bottom right on chatbot (Employee/Manager) only ----- */
@@ -88,30 +89,17 @@ body.page--landing .ey-logo-bottom {
 .landing-tagline {
     font-size: 1.1rem;
     color: var(--ey-text-muted);
-    margin-bottom: 1.25rem;
+    margin-bottom: 0.5rem;
 }
-.btn-login--landing {
-    padding: 0.5rem 1.25rem;
-    background: var(--ey-yellow);
-    color: var(--ey-black);
-    border: none;
-    border-radius: 6px;
-    font-family: var(--font-ey);
-    font-weight: 600;
-    font-size: 0.9rem;
-    cursor: pointer;
-}
-.btn-login--landing:hover {
-    background: var(--ey-yellow-dark);
+.landing-cta {
+    font-size: 1rem;
+    color: var(--ey-text-muted);
+    margin-bottom: 1.5rem;
+    font-weight: 500;
 }
 
 .landing-choices {
     width: 100%;
-}
-.landing-prompt {
-    font-size: 1rem;
-    color: var(--ey-text-muted);
-    margin-bottom: 1rem;
 }
 .landing-buttons {
     display: flex;
@@ -218,6 +206,184 @@ body.page--landing .ey-logo-bottom {
 }
 .page--app .btn-login:hover {
     background: var(--ey-yellow-dark);
+}
+.header-auth {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.header-user {
+    font-size: 0.9rem;
+    color: var(--ey-text-muted);
+}
+.btn-logout {
+    padding: 0.4rem 0.75rem;
+    background: transparent;
+    color: var(--ey-text-muted);
+    border: 1px solid var(--ey-border);
+    border-radius: 6px;
+    font-family: var(--font-ey);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+.btn-logout:hover {
+    color: var(--ey-text);
+    border-color: var(--ey-text-muted);
+}
+
+/* ----- Login page: clean pop-out card with yellow shadow ----- */
+.page--login {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 2rem 1.25rem;
+}
+.page--login.page--hidden {
+    display: none !important;
+}
+.login-back {
+    position: fixed;
+    top: 1.25rem;
+    left: 1.25rem;
+    color: var(--ey-yellow);
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    font-family: var(--font-ey);
+}
+.login-back:hover {
+    text-decoration: underline;
+}
+.login-center {
+    width: 100%;
+    max-width: 400px;
+}
+/* Pop-out card: light color, tasteful yellow shadow */
+.login-card {
+    background: #fafafa;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 20px;
+    padding: 2.5rem 2rem;
+    box-shadow:
+        0 4px 6px rgba(0, 0, 0, 0.04),
+        0 12px 24px rgba(0, 0, 0, 0.06),
+        0 24px 48px rgba(255, 230, 0, 0.12),
+        0 0 0 1px rgba(255, 230, 0, 0.06);
+}
+.login-card-header {
+    text-align: center;
+    margin-bottom: 1.75rem;
+}
+.login-logo {
+    height: 38px;
+    width: auto;
+    margin-bottom: 1.25rem;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+.login-heading {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0 0 0.35rem 0;
+    letter-spacing: -0.02em;
+}
+.login-description {
+    font-size: 0.9rem;
+    color: #6b7280;
+    margin: 0;
+}
+.auth-form--hidden {
+    display: none !important;
+}
+.auth-form--signin .auth-input,
+.auth-form--register .auth-input {
+    width: 100%;
+    padding: 0.7rem 0.9rem;
+    margin-bottom: 1rem;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    color: #1a1a1a;
+    font-family: var(--font-ey);
+    font-size: 1rem;
+    display: block;
+    box-sizing: border-box;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.auth-form--signin .auth-input::placeholder,
+.auth-form--register .auth-input::placeholder {
+    color: #9ca3af;
+}
+.auth-form--signin .auth-input:focus,
+.auth-form--register .auth-input:focus {
+    outline: none;
+    border-color: var(--ey-yellow);
+    box-shadow: 0 0 0 3px rgba(255, 230, 0, 0.2);
+}
+.auth-label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.4rem;
+}
+.auth-error {
+    color: #dc2626;
+    font-size: 0.875rem;
+    margin: 0 0 1rem 0;
+    min-height: 1.25em;
+}
+.auth-error:empty {
+    display: none;
+}
+.auth-btn {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    margin-bottom: 1.25rem;
+    background: var(--ey-yellow);
+    color: var(--ey-black);
+    border: none;
+    border-radius: 10px;
+    font-family: var(--font-ey);
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+.auth-btn:hover {
+    background: var(--ey-yellow-dark);
+}
+.auth-footer {
+    font-size: 0.875rem;
+    color: #6b7280;
+    text-align: center;
+    margin: 0;
+}
+.auth-footer-link {
+    background: none;
+    border: none;
+    color: #b45309;
+    font-family: var(--font-ey);
+    font-size: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+}
+.auth-footer-link:hover {
+    color: #92400e;
+}
+.auth-register-extra {
+    margin-top: 0.5rem;
+}
+.auth-register-extra .auth-label {
+    margin-top: 0.75rem;
+}
+.auth-register-extra .auth-label:first-child {
+    margin-top: 0;
 }
 
 /* ----- App container ----- */
@@ -521,6 +687,222 @@ body.page--landing .ey-logo-bottom {
     background: rgba(255, 230, 0, 0.12);
     color: var(--ey-yellow);
 }
+
+/* ----- Manager: jobs list + side panel + recommendations + employee popout ----- */
+.manager-layout {
+    position: relative;
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.manager-main {
+    flex: 1;
+    min-width: 0;
+}
+.jobs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.job-card {
+    display: block;
+    width: 100%;
+    padding: 1rem;
+    text-align: left;
+    background: var(--ey-bg-input);
+    border: 1px solid var(--ey-border);
+    border-radius: 8px;
+    color: var(--ey-text);
+    font-family: var(--font-ey);
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.job-card:hover {
+    border-color: var(--ey-yellow);
+    box-shadow: 0 0 12px var(--ey-yellow-glow);
+}
+.job-card__title {
+    font-weight: 600;
+    color: var(--ey-yellow);
+    margin-bottom: 0.25rem;
+}
+.job-card__meta {
+    font-size: 0.85rem;
+    color: var(--ey-text-muted);
+}
+
+.manager-panel {
+    width: 340px;
+    flex-shrink: 0;
+    background: var(--ey-bg);
+    border: 1px solid var(--ey-border);
+    border-radius: 8px;
+    padding: 1rem;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+}
+.manager-panel--closed {
+    display: none !important;
+}
+.manager-panel--open {
+    display: block !important;
+}
+.manager-panel-inner {
+    position: relative;
+}
+.manager-panel-close {
+    position: absolute;
+    top: -0.25rem;
+    right: 0;
+    padding: 0.25rem 0.5rem;
+    background: transparent;
+    border: none;
+    color: var(--ey-text-muted);
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.manager-panel-close:hover {
+    color: var(--ey-yellow);
+}
+.manager-job-detail {
+    font-size: 0.95rem;
+    color: var(--ey-text);
+    margin-bottom: 1rem;
+}
+.manager-job-detail .job-detail-title {
+    font-weight: 700;
+    color: var(--ey-yellow);
+    margin-bottom: 0.5rem;
+}
+.manager-job-detail .job-detail-meta {
+    font-size: 0.85rem;
+    color: var(--ey-text-muted);
+    margin-bottom: 0.75rem;
+}
+.manager-job-detail .job-detail-desc {
+    line-height: 1.5;
+    color: var(--ey-text);
+}
+.btn-recommend-employees {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--ey-yellow);
+    color: var(--ey-black);
+    border: none;
+    border-radius: 6px;
+    font-family: var(--font-ey);
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+.btn-recommend-employees:hover {
+    background: var(--ey-yellow-dark);
+    transform: translateY(-1px);
+}
+
+.recommendations-wrap {
+    margin-top: 1.5rem;
+}
+.section-title-sub {
+    font-weight: 400;
+    color: var(--ey-text-muted);
+    font-size: 0.9rem;
+}
+.recommendations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.recommendation-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.875rem 1rem;
+    background: var(--ey-bg-input);
+    border: 1px solid var(--ey-border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+.recommendation-card:hover {
+    border-color: var(--ey-yellow);
+    background: rgba(255, 230, 0, 0.08);
+}
+.recommendation-card__name {
+    font-weight: 600;
+    color: var(--ey-text);
+}
+.recommendation-card__pct {
+    font-weight: 700;
+    color: var(--ey-black);
+    background: var(--ey-yellow);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.employee-popout {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 50vh;
+    background: var(--ey-bg-card);
+    border-top: 2px solid var(--ey-yellow);
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4);
+    z-index: 200;
+    transition: transform 0.3s ease;
+    overflow: hidden;
+}
+.employee-popout--closed {
+    transform: translateY(100%);
+    pointer-events: none;
+}
+.employee-popout--open {
+    transform: translateY(0);
+    pointer-events: auto;
+}
+.employee-popout-inner {
+    position: relative;
+    padding: 1.25rem 1.5rem 2rem;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+.employee-popout-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    background: transparent;
+    border: none;
+    color: var(--ey-text-muted);
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.employee-popout-close:hover {
+    color: var(--ey-yellow);
+}
+.employee-popout-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--ey-yellow);
+    margin-bottom: 0.75rem;
+}
+.employee-popout-content {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    color: var(--ey-text);
+    white-space: pre-wrap;
+}
+
+.chat-section--manager {
+    margin-top: 1rem;
+}
+
 
 .sr-only {
     position: absolute;

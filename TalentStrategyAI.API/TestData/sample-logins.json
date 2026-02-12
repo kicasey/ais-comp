@@ -1,0 +1,54 @@
+{
+  "description": "Test login credentials for development and testing only. Do not use in production.",
+  "logins": [
+    {
+      "userId": "emp-1",
+      "email": "alex.chen@ey.com",
+      "password": "Test123!",
+      "role": "employee",
+      "displayName": "Alex Chen"
+    },
+    {
+      "userId": "emp-2",
+      "email": "jordan.smith@ey.com",
+      "password": "Test123!",
+      "role": "employee",
+      "displayName": "Jordan Smith"
+    },
+    {
+      "userId": "emp-3",
+      "email": "sam.williams@ey.com",
+      "password": "Test123!",
+      "role": "employee",
+      "displayName": "Sam Williams"
+    },
+    {
+      "userId": "emp-4",
+      "email": "casey.brown@ey.com",
+      "password": "Test123!",
+      "role": "employee",
+      "displayName": "Casey Brown"
+    },
+    {
+      "userId": "emp-5",
+      "email": "morgan.lee@ey.com",
+      "password": "Test123!",
+      "role": "employee",
+      "displayName": "Morgan Lee"
+    },
+    {
+      "userId": "mgr-1",
+      "email": "taylor.johnson@ey.com",
+      "password": "Manager1!",
+      "role": "manager",
+      "displayName": "Taylor Johnson"
+    },
+    {
+      "userId": "mgr-2",
+      "email": "riley.davis@ey.com",
+      "password": "Manager1!",
+      "role": "manager",
+      "displayName": "Riley Davis"
+    }
+  ]
+}
