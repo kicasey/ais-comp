@@ -452,7 +452,7 @@ function setupChatSendButtons() {
         if (auth) {
             payload.userEmail = auth.email || '';
             payload.userName = auth.displayName || '';
-            payload.userId = auth.userId || '';
+            payload.userId = String(auth.userId || '');
         }
         appendChatMessage(messagesEl, 'You', text, 'user');
         var loadingId = 'loading-' + Date.now();
@@ -520,7 +520,7 @@ function sendPresetAndShowResponse(preset, messagesEl, chatEndpoint) {
     if (auth) {
         payload.userEmail = auth.email || '';
         payload.userName = auth.displayName || '';
-        payload.userId = auth.userId || '';
+        payload.userId = String(auth.userId || '');
     }
     appendChatMessage(messagesEl, 'You', getPresetLabel(preset), 'user');
     var loadingId = 'loading-' + Date.now();
@@ -712,11 +712,15 @@ function setupManagerFlow() {
             recommendationsWrap.style.display = 'block';
             if (recommendationsJobTitle) recommendationsJobTitle.textContent = ' for "' + (selectedJobTitle || '') + '"';
             var recHeaders = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
+            // Store last AI candidates so popout can access details
+            var lastCandidates = [];
+
             function renderCandidates(candidates) {
                 if (!candidates || candidates.length === 0) {
                     recommendationsListEl.innerHTML = '<p class="placeholder-text">No recommendations returned.</p>';
                     return;
                 }
+                lastCandidates = candidates;
                 recommendationsListEl.innerHTML = '';
                 candidates.slice(0, 10).forEach(function (c) {
                     var name = c.candidate_name || c.name || c.display || c.resume_id || c.employeeId || '';
@@ -727,41 +731,165 @@ function setupManagerFlow() {
                     card.className = 'recommendation-card';
                     card.setAttribute('data-employee-id', empId);
                     card.setAttribute('data-employee-name', name);
-                    card.innerHTML = '<span class="recommendation-card__name">' + escapeHtml(name) + '</span><span class="recommendation-card__pct">' + (pct != null ? pct + '%' : '—') + '</span>';
+                    card.innerHTML = '<span class="recommendation-card__name">' + escapeHtml(name) + '</span>' +
+                        '<span class="recommendation-card__pct">' + (pct != null ? pct + '%' : '—') + '</span>';
                     card.addEventListener('click', function () {
-                        openEmployeePopout(empId, name || 'Employee');
+                        openCandidateDetail(c, name);
                     });
                     recommendationsListEl.appendChild(card);
                 });
             }
-            fetch(RESUME_API_BASE + '/api/chat', {
+
+            function openCandidateDetail(c, name) {
+                var empId = c.resume_id || c.employeeId || '';
+                var pct = c.score != null ? c.score : (c.confidencePercent != null ? c.confidencePercent : null);
+                var strengths = c.strengths || [];
+                var gaps = c.gaps || [];
+                var reason = c.reason || '';
+
+                var html = '<h3 style="margin:0 0 0.25rem;color:var(--ey-yellow)">' + escapeHtml(name) + '</h3>';
+                if (pct != null) html += '<p style="margin:0 0 0.75rem;font-size:0.9rem;color:#9ca3af">Match score: <strong style="color:var(--ey-yellow)">' + pct + '%</strong></p>';
+                if (reason) html += '<p style="margin:0 0 0.75rem;color:#e5e7eb;line-height:1.5">' + escapeHtml(reason) + '</p>';
+                if (strengths.length > 0) {
+                    html += '<p style="margin:0.75rem 0 0.25rem;font-weight:600;color:var(--ey-yellow)">Strengths</p><ul style="margin:0;padding-left:1.25rem;color:#e5e7eb">';
+                    strengths.forEach(function (s) { html += '<li style="margin-bottom:0.25rem;line-height:1.4">' + escapeHtml(s) + '</li>'; });
+                    html += '</ul>';
+                }
+                if (gaps.length > 0) {
+                    html += '<p style="margin:0.75rem 0 0.25rem;font-weight:600;color:#f87171">Gaps</p><ul style="margin:0;padding-left:1.25rem;color:#e5e7eb">';
+                    gaps.forEach(function (g) { html += '<li style="margin-bottom:0.25rem;line-height:1.4">' + escapeHtml(g) + '</li>'; });
+                    html += '</ul>';
+                }
+                // Upskilling plan placeholder
+                html += '<div style="margin-top:1rem;border-top:1px solid var(--ey-border);padding-top:0.75rem">';
+                html += '<p style="margin:0 0 0.5rem;font-weight:600;color:var(--ey-yellow)">Upskilling Plan</p>';
+                html += '<p id="upskilling-plan-content" style="color:#9ca3af;font-size:0.85rem">Generating upskilling plan…</p>';
+                html += '</div>';
+
+                employeePopoutTitle.textContent = 'Candidate Details';
+                employeePopoutContent.innerHTML = html;
+                employeePopout.classList.remove('employee-popout--closed');
+                employeePopout.classList.add('employee-popout--open');
+
+                // Fire AI call for upskilling plan
+                var jobTitle = selectedJobTitle || selectedJobId || 'the selected role';
+                var gapList = gaps.length > 0 ? gaps.join(', ') : 'general skill improvement';
+                var strengthList = strengths.length > 0 ? strengths.join(', ') : 'none listed';
+                var upskillPrompt = 'INSTRUCTION: Create a concise upskilling plan for a candidate named "' + (name || empId) + '" being considered for the role "' + jobTitle + '". '
+                    + 'Their strengths: ' + strengthList + '. '
+                    + 'Their gaps: ' + gapList + '. '
+                    + 'Provide a practical, actionable upskilling plan with specific courses, certifications, or training to close these gaps. '
+                    + 'Format as a numbered list of 3-6 concrete steps. Each step has a title and brief description (1-2 sentences). '
+                    + 'Respond with ONLY valid JSON, nothing else: '
+                    + '{"upskilling_plan":[{"step":"Step title","description":"What to do and why"}]}';
+
+                var upskillHeaders = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
+                fetch('/api/chat', {
+                    method: 'POST',
+                    headers: upskillHeaders,
+                    body: JSON.stringify({ preset: 'custom', customText: upskillPrompt })
+                })
+                .then(function (res) { return res.ok ? res.json() : Promise.reject(new Error('Failed')); })
+                .then(function (data) {
+                    var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
+                    var plan = null;
+                    if (item && item.upskilling_plan) plan = item.upskilling_plan;
+                    if (!plan && item && item.response) {
+                        var raw = item.response;
+                        raw = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
+                        try { var p = JSON.parse(raw); plan = p.upskilling_plan || null; } catch (e) {
+                            var si = raw.indexOf('{');
+                            if (si !== -1) {
+                                var bc = 0, ei = si;
+                                for (var i = si; i < raw.length && i < si + 5000; i++) {
+                                    if (raw[i] === '{') bc++;
+                                    if (raw[i] === '}') { bc--; if (bc === 0) { ei = i + 1; break; } }
+                                }
+                                try { var ex = JSON.parse(raw.substring(si, ei)); plan = ex.upskilling_plan || null; } catch (e2) {}
+                            }
+                        }
+                    }
+                    var el = document.getElementById('upskilling-plan-content');
+                    if (!el) return;
+                    if (plan && plan.length > 0) {
+                        var ph = '<ol style="margin:0;padding-left:1.25rem;color:#e5e7eb">';
+                        plan.forEach(function (s) {
+                            ph += '<li style="margin-bottom:0.5rem;line-height:1.4">';
+                            ph += '<strong style="color:var(--ey-yellow)">' + escapeHtml(s.step || s.title || '') + '</strong>';
+                            if (s.description) ph += '<br><span style="font-size:0.82rem;color:#d1d5db">' + escapeHtml(s.description) + '</span>';
+                            ph += '</li>';
+                        });
+                        ph += '</ol>';
+                        el.innerHTML = ph;
+                    } else if (item && item.response) {
+                        el.style.color = '#e5e7eb';
+                        el.textContent = item.response;
+                    } else {
+                        el.textContent = 'No upskilling plan available.';
+                    }
+                })
+                .catch(function () {
+                    var el = document.getElementById('upskilling-plan-content');
+                    if (el) el.textContent = 'Could not generate upskilling plan.';
+                });
+            }
+            fetch('/api/chat', {
                 method: 'POST',
                 headers: recHeaders,
                 body: JSON.stringify({
                     preset: 'recommend_for_job',
-                    customText: 'Give me the top 3 candidates for this position: ' + (selectedJobTitle || selectedJobId) + '. Only return resume_id and confidence score.'
+                    customText: 'INSTRUCTION: You must match every candidate in the database to the job titled "' + (selectedJobTitle || selectedJobId) + '". Score each candidate 0-100 based on how well their skills and experience fit this role. Do NOT ask clarifying questions. Do NOT explain. Respond with ONLY this JSON, nothing else: {"top_candidates":[{"candidate_name":"Full Name","resume_id":"the-resume-id","score":85}]}. Include ALL candidates, ranked by score descending.'
                 })
             })
                 .then(function (res) { return res.ok ? res.json() : Promise.reject(new Error('Failed to load recommendations')); })
                 .then(function (data) {
                     var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
-                    var candidates = (item && item.top_candidates) ? item.top_candidates : (Array.isArray(data) ? data : null);
+                    var candidates = (item && item.top_candidates) ? item.top_candidates : null;
+                    // If no structured candidates, try parsing JSON from the response text
+                    if ((!candidates || candidates.length === 0) && item && item.response) {
+                        var raw = item.response;
+                        // Strip markdown code fences
+                        raw = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
+                        // Try parsing the whole response as JSON first
+                        try {
+                            var full = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+                            if (full && full.top_candidates) candidates = full.top_candidates;
+                        } catch (e) { /* not pure JSON */ }
+                        // Try extracting JSON object containing top_candidates
+                        if (!candidates || candidates.length === 0) {
+                            try {
+                                var idx = raw.indexOf('"top_candidates"');
+                                if (idx !== -1) {
+                                    var brace = raw.lastIndexOf('{', idx);
+                                    if (brace !== -1) {
+                                        var depth = 0;
+                                        var endIdx = -1;
+                                        for (var i = brace; i < raw.length; i++) {
+                                            if (raw[i] === '{') depth++;
+                                            else if (raw[i] === '}') { depth--; if (depth === 0) { endIdx = i + 1; break; } }
+                                        }
+                                        if (endIdx !== -1) {
+                                            var parsed = JSON.parse(raw.substring(brace, endIdx));
+                                            if (parsed.top_candidates) candidates = parsed.top_candidates;
+                                        }
+                                    }
+                                }
+                            } catch (e) { /* give up */ }
+                        }
+                    }
                     if (candidates && candidates.length > 0) {
                         renderCandidates(candidates);
                         return;
                     }
-                    return fetch('/api/jobs/' + encodeURIComponent(selectedJobId) + '/recommendations', { headers: getAuthHeader() })
-                        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
-                        .then(function (arr) { renderCandidates(Array.isArray(arr) ? arr : []); })
-                        .catch(function () { recommendationsListEl.innerHTML = '<p class="placeholder-text">No recommendations returned.</p>'; });
+                    // If AI returned text but no candidates, show the text
+                    if (item && item.response) {
+                        recommendationsListEl.innerHTML = '<p class="placeholder-text">' + escapeHtml(item.response) + '</p>';
+                        return;
+                    }
+                    recommendationsListEl.innerHTML = '<p class="placeholder-text">No recommendations returned.</p>';
                 })
                 .catch(function () {
-                    fetch('/api/jobs/' + encodeURIComponent(selectedJobId) + '/recommendations', { headers: getAuthHeader() })
-                        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
-                        .then(function (arr) { renderCandidates(Array.isArray(arr) ? arr : []); })
-                        .catch(function () {
-                            recommendationsListEl.innerHTML = '<p class="placeholder-text">Could not load recommendations.</p>';
-                        });
+                    recommendationsListEl.innerHTML = '<p class="placeholder-text">Could not load recommendations.</p>';
                 });
         });
     }

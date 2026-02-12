@@ -63,12 +63,11 @@ public class JobsController : ControllerBase
         var jobsPath = _configuration["ResumeApi:RecommendationsPath"] ?? _configuration["ResumeApi:JobsPath"] ?? "api/jobs";
         var path = $"{jobsPath.TrimEnd('/')}/{Uri.EscapeDataString(jobId)}/recommendations";
         var (success, data) = await TryGetFromApiAsync<EmployeeMatchDto[]>(path);
-        if (success && data != null && data.Length > 0)
+        if (success && data != null)
         {
             return Ok(data);
         }
-        var list = await GetRecommendationsFromTestDataAsync(jobId);
-        return Ok(list);
+        return Ok(Array.Empty<EmployeeMatchDto>());
     }
 
     private async Task<(bool Success, T? Data)> TryGetFromApiAsync<T>(string path) where T : class

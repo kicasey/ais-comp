@@ -59,7 +59,7 @@ public class WebhookProxyService : IWebhookProxyService
     private async Task<HttpResponseMessage> ForwardRequestAsync(string webhookUrl, HttpRequest request, bool isMultipart, CancellationToken ct)
     {
         var client = _clientFactory.CreateClient();
-        client.Timeout = TimeSpan.FromSeconds(isMultipart ? 120 : 30);
+        client.Timeout = TimeSpan.FromSeconds(120);
 
         if (isMultipart && request.HasFormContentType)
         {

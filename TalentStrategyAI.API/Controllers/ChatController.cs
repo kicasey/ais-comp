@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace TalentStrategyAI.API.Controllers;
@@ -63,10 +64,18 @@ public class ChatController : ControllerBase
                 if (response.IsSuccessStatusCode)
                 {
                     var body = await response.Content.ReadAsStringAsync();
-                    var responseText = TryParseResponseText(body);
-                    if (!string.IsNullOrEmpty(responseText))
+                    if (!string.IsNullOrEmpty(body))
                     {
-                        return Ok(new ChatResponse { Response = responseText });
+                        // Pass through the raw JSON so structured data (top_candidates, etc.) is preserved
+                        try
+                        {
+                            var parsed = JsonSerializer.Deserialize<JsonElement>(body);
+                            return Ok(parsed);
+                        }
+                        catch
+                        {
+                            return Ok(new ChatResponse { Response = body });
+                        }
                     }
                 }
                 else
@@ -119,6 +128,7 @@ public class ChatController : ControllerBase
         }
     }
 
+    [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString)]
     public class ChatRequest
     {
         public string? Preset { get; set; }
