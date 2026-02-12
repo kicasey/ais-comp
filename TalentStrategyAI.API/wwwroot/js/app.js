@@ -1,7 +1,7 @@
 // TalentStrategyAI – Landing → Employee | Manager. EY Talent Match.
 
 var AUTH_STORAGE_KEY = 'talentStrategyAuth';
-var RESUME_API_BASE = 'https://resume-api.campbellthompson.com';
+var RESUME_API_BASE = 'https://resume-api.campbellthompson.com'; // used only for reference; chat goes through our backend
 
 document.addEventListener('DOMContentLoaded', function () {
     initializeApp();
@@ -13,6 +13,7 @@ function initializeApp() {
     setupBackButton();
     setupAuth();
     setupResumeUploadForm();
+    loadEmployeeProfileWhenNeeded();
     setupChatPresets('employee');
     setupChatPresets('manager');
     setupChatSendButtons();
@@ -314,6 +315,7 @@ function showAppByRole(role) {
     } else {
         if (emp) emp.classList.remove('interface--hidden');
         if (mgr) mgr.classList.add('interface--hidden');
+        loadEmployeeProfile();
     }
 }
 
@@ -327,7 +329,68 @@ function resetManagerPanel() {
     if (wrap) wrap.style.display = 'none';
 }
 
-// ----- Resume upload: file input only covers the label (no whole-page click) -----
+// ----- Employee profile: load and show name, email, resume status -----
+function loadEmployeeProfileWhenNeeded() {
+    var auth = getStoredAuth();
+    if (!auth || (auth.role || '').toLowerCase() !== 'employee') return;
+    var emp = document.getElementById('interface-employee');
+    if (emp && !emp.classList.contains('interface--hidden')) loadEmployeeProfile();
+}
+
+function loadEmployeeProfile() {
+    var nameEl = document.getElementById('profile-name');
+    var emailEl = document.getElementById('profile-email');
+    var valueEl = document.getElementById('profile-resume-value');
+    if (!valueEl) return;
+
+    var headers = getAuthHeader();
+    if (!headers.Authorization) {
+        if (nameEl) nameEl.textContent = '';
+        if (emailEl) emailEl.textContent = '';
+        valueEl.textContent = 'Sign in to see your profile.';
+        return;
+    }
+
+    valueEl.textContent = 'Loading…';
+    fetch('/api/resume/profile', { headers: headers })
+        .then(function (res) { return res.json().catch(function () { return null; }); })
+        .then(function (data) {
+            if (!data) {
+                valueEl.textContent = 'Could not load profile.';
+                return;
+            }
+            if (data.isEmployee) {
+                if (nameEl) nameEl.textContent = (data.displayName || data.name || '').trim() || '—';
+                if (emailEl) emailEl.textContent = (data.email || '').trim() || '—';
+                if (data.hasResume && data.resumeFileName) {
+                    valueEl.textContent = data.resumeFileName + (data.resumeUploadedAt ? ' (uploaded ' + formatResumeDate(data.resumeUploadedAt) + ')' : '');
+                    valueEl.classList.add('has-resume');
+                } else {
+                    valueEl.textContent = 'No resume on file. Upload one below.';
+                    valueEl.classList.remove('has-resume');
+                }
+            } else {
+                if (nameEl) nameEl.textContent = '';
+                if (emailEl) emailEl.textContent = '';
+                valueEl.textContent = 'Resume is for employee profiles only.';
+                valueEl.classList.remove('has-resume');
+            }
+        })
+        .catch(function () {
+            valueEl.textContent = 'Could not load profile.';
+        });
+}
+
+function formatResumeDate(iso) {
+    if (!iso) return '';
+    try {
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (e) { return ''; }
+}
+
+// ----- Resume upload: one resume per profile via our API -----
 function setupResumeUploadForm() {
     var form = document.getElementById('resume-upload-form');
     var fileInput = document.getElementById('resume-file');
@@ -379,14 +442,17 @@ function setupResumeUploadForm() {
         hideUploadMessage();
 
         try {
-            var formData = new FormData(form);
-            var response = await fetch(RESUME_API_BASE + '/api/resume/upload', { method: 'POST', body: formData });
-            var result = await response.json();
+            var formData = new FormData();
+            formData.append('resume', file);
+            var headers = getAuthHeader();
+            var response = await fetch('/api/resume/upload', { method: 'POST', headers: headers, body: formData });
+            var result = await response.json().catch(function () { return {}; });
             if (response.ok) {
-                showUploadMessage('Resume uploaded successfully!', 'success');
+                showUploadMessage('Resume saved to your profile.', 'success');
                 form.reset();
                 fileLabel.textContent = 'Choose file...';
                 fileLabel.classList.remove('file-selected');
+                loadEmployeeProfile();
             } else {
                 showUploadMessage(result.message || 'Upload failed. Please try again.', 'error');
             }
@@ -422,12 +488,11 @@ function setupChatPresets(role) {
     var messagesEl = role === 'employee' ? document.getElementById('chat-messages-employee') : document.getElementById('chat-messages-manager');
     if (!messagesEl) return;
 
-    var chatEndpoint = role === 'employee' ? '/api/employee-chat' : '/api/chat';
     presetButtons.forEach(function (btn) {
         btn.addEventListener('click', function (e) {
             e.preventDefault();
             var preset = this.getAttribute('data-preset');
-            sendPresetAndShowResponse(preset, messagesEl, chatEndpoint);
+            sendPresetAndShowResponse(preset, messagesEl, role);
         });
     });
 }
@@ -458,7 +523,7 @@ function setupChatSendButtons() {
         var loadingId = 'loading-' + Date.now();
         appendChatMessage(messagesEl, 'Assistant', '…', 'assistant', true, loadingId);
         var headers = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
-        fetch(RESUME_API_BASE + endpoint, {
+        fetch('/api/chat', {
             method: 'POST',
             headers: headers,
             body: JSON.stringify(payload)
@@ -493,27 +558,26 @@ function setupChatSendButtons() {
     }
 
     if (sendEmployee && inputEmployee && messagesEmp) {
-        sendEmployee.addEventListener('click', function () { sendFromInput(inputEmployee, messagesEmp, '/api/employee-chat'); });
+        sendEmployee.addEventListener('click', function () { sendFromInput(inputEmployee, messagesEmp, 'employee'); });
         inputEmployee.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                sendFromInput(inputEmployee, messagesEmp, '/api/employee-chat');
+                sendFromInput(inputEmployee, messagesEmp, 'employee');
             }
         });
     }
     if (sendManager && inputManager && messagesMgr) {
-        sendManager.addEventListener('click', function () { sendFromInput(inputManager, messagesMgr, '/api/chat'); });
+        sendManager.addEventListener('click', function () { sendFromInput(inputManager, messagesMgr, 'manager'); });
         inputManager.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                sendFromInput(inputManager, messagesMgr, '/api/chat');
+                sendFromInput(inputManager, messagesMgr, 'manager');
             }
         });
     }
 }
 
-function sendPresetAndShowResponse(preset, messagesEl, chatEndpoint) {
-    var endpoint = chatEndpoint || '/api/chat';
+function sendPresetAndShowResponse(preset, messagesEl, role) {
     var auth = getStoredAuth();
     var payload = { preset: preset };
     if (auth) {
@@ -526,7 +590,7 @@ function sendPresetAndShowResponse(preset, messagesEl, chatEndpoint) {
     appendChatMessage(messagesEl, 'Assistant', '…', 'assistant', true, loadingId);
 
     var headers = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
-    fetch(RESUME_API_BASE + endpoint, {
+    fetch('/api/chat', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(payload)
@@ -710,7 +774,7 @@ function setupManagerFlow() {
             recommendationsWrap.style.display = 'block';
             if (recommendationsJobTitle) recommendationsJobTitle.textContent = ' for "' + (selectedJobTitle || '') + '"';
             var recHeaders = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
-            fetch(RESUME_API_BASE + '/api/chat', {
+            fetch('/api/chat', {
                 method: 'POST',
                 headers: recHeaders,
                 body: JSON.stringify({
@@ -756,7 +820,7 @@ function setupManagerFlow() {
         employeePopout.classList.add('employee-popout--open');
 
         var popoutHeaders = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
-        fetch(RESUME_API_BASE + '/api/chat', {
+        fetch('/api/chat', {
             method: 'POST',
             headers: popoutHeaders,
             body: JSON.stringify({

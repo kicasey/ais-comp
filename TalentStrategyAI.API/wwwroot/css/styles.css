@@ -411,6 +411,33 @@ body.page--landing .ey-logo-bottom {
     margin-bottom: 0.75rem;
 }
 
+/* ----- Employee profile card ----- */
+.profile-section {
+    margin-bottom: 1.5rem;
+}
+.profile-card {
+    background: var(--ey-bg-card);
+    border: 1px solid var(--ey-border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+}
+.profile-line {
+    margin: 0 0 0.35rem 0;
+    font-size: 0.95rem;
+    color: var(--ey-text);
+}
+.profile-resume-row {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+}
+.profile-resume-value {
+    color: var(--ey-text-muted);
+}
+.profile-resume-value.has-resume {
+    color: var(--ey-yellow);
+}
+
 /* ----- Resume upload: file input only on the label (fix click-everywhere) ----- */
 .upload-section {
     margin-bottom: 1.5rem;
