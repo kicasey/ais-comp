@@ -156,7 +156,45 @@
                 <section class="interface interface--hidden" id="interface-manager" aria-label="Manager interface">
                     <div class="manager-layout">
                         <div class="manager-main">
-                            <h2 class="section-title">Open job postings</h2>
+                            <div class="manager-main-header">
+                                <h2 class="section-title">Open job postings</h2>
+                                <button type="button" class="btn-add-job" id="btn-add-job">Add job</button>
+                            </div>
+                            <div class="add-job-panel" id="add-job-panel" aria-label="Add job form" hidden>
+                                <form id="add-job-form" class="add-job-form">
+                                    <div class="add-job-row">
+                                        <div class="add-job-field">
+                                            <label for="add-job-title">Job title</label>
+                                            <input type="text" id="add-job-title" name="title" placeholder="e.g. Senior Consultant – Technology" required>
+                                        </div>
+                                        <div class="add-job-field">
+                                            <label for="add-job-department">Department</label>
+                                            <input type="text" id="add-job-department" name="department" placeholder="e.g. Technology">
+                                        </div>
+                                        <div class="add-job-field">
+                                            <label for="add-job-location">Location</label>
+                                            <input type="text" id="add-job-location" name="location" placeholder="e.g. New York or Remote">
+                                        </div>
+                                    </div>
+                                    <div class="add-job-row add-job-row--description">
+                                        <div class="add-job-field add-job-field--full">
+                                            <label for="add-job-description">Description / key requirements</label>
+                                            <textarea id="add-job-description" name="description" rows="3" placeholder="Paste the role description or key requirements"></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="add-job-row">
+                                        <div class="add-job-field add-job-field--full">
+                                            <label for="add-job-link">EY job posting link (optional)</label>
+                                            <input type="url" id="add-job-link" name="link" placeholder="Paste the EY job posting URL">
+                                        </div>
+                                    </div>
+                                    <div class="add-job-actions">
+                                        <button type="button" class="add-job-cancel" id="add-job-cancel">Cancel</button>
+                                        <button type="submit" class="add-job-save">Save job</button>
+                                    </div>
+                                    <p id="add-job-message" class="add-job-message" aria-live="polite"></p>
+                                </form>
+                            </div>
                             <div id="manager-jobs-list" class="jobs-list" aria-live="polite"><p class="placeholder-text">Loading job postings…</p></div>
                             <div id="manager-recommendations-wrap" class="recommendations-wrap" style="display: none;">
                                 <h2 class="section-title">Recommended employees <span id="manager-recommendations-job-title" class="section-title-sub"></span></h2>

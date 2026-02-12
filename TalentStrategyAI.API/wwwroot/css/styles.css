@@ -736,6 +736,123 @@ body.page--landing .ey-logo-bottom {
     flex: 1;
     min-width: 0;
 }
+.manager-main-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+.btn-add-job {
+    padding: 0.4rem 0.9rem;
+    background: transparent;
+    color: var(--ey-yellow);
+    border: 1px solid var(--ey-yellow);
+    border-radius: 6px;
+    font-family: var(--font-ey);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.btn-add-job:hover {
+    background: var(--ey-yellow);
+    color: var(--ey-black);
+}
+.add-job-panel {
+    margin-bottom: 1rem;
+    padding: 0.75rem 0.9rem;
+    background: var(--ey-bg-input);
+    border: 1px solid var(--ey-border);
+    border-radius: 8px;
+}
+.add-job-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.add-job-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+.add-job-row--description {
+    flex-direction: column;
+}
+.add-job-field {
+    flex: 1;
+    min-width: 140px;
+}
+.add-job-field--full {
+    flex-basis: 100%;
+}
+.add-job-field label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--ey-text-muted);
+    margin-bottom: 0.25rem;
+}
+.add-job-field input,
+.add-job-field textarea {
+    width: 100%;
+    padding: 0.45rem 0.7rem;
+    background: var(--ey-bg);
+    border: 1px solid var(--ey-border);
+    border-radius: 6px;
+    color: var(--ey-text);
+    font-family: var(--font-ey);
+    font-size: 0.9rem;
+}
+.add-job-field input::placeholder,
+.add-job-field textarea::placeholder {
+    color: var(--ey-text-muted);
+}
+.add-job-field input:focus,
+.add-job-field textarea:focus {
+    outline: none;
+    border-color: var(--ey-yellow);
+    box-shadow: 0 0 0 2px var(--ey-yellow-glow);
+}
+.add-job-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+.add-job-cancel {
+    padding: 0.4rem 0.9rem;
+    background: transparent;
+    color: var(--ey-text-muted);
+    border: 1px solid var(--ey-border);
+    border-radius: 6px;
+    font-family: var(--font-ey);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+.add-job-cancel:hover {
+    color: var(--ey-text);
+    border-color: var(--ey-text-muted);
+}
+.add-job-save {
+    padding: 0.4rem 1rem;
+    background: var(--ey-yellow);
+    color: var(--ey-black);
+    border: none;
+    border-radius: 6px;
+    font-family: var(--font-ey);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.add-job-save:hover {
+    background: var(--ey-yellow-dark);
+}
+.add-job-message {
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--ey-text-muted);
+}
 .jobs-list {
     display: flex;
     flex-direction: column;
@@ -754,6 +871,10 @@ body.page--landing .ey-logo-bottom {
     cursor: pointer;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
+.job-card--custom {
+    position: relative;
+    border-style: dashed;
+}
 .job-card:hover {
     border-color: var(--ey-yellow);
     box-shadow: 0 0 12px var(--ey-yellow-glow);
@@ -766,6 +887,19 @@ body.page--landing .ey-logo-bottom {
 .job-card__meta {
     font-size: 0.85rem;
     color: var(--ey-text-muted);
+}
+.job-card__badge {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.75rem;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: 999px;
+    background: rgba(255, 230, 0, 0.12);
+    color: var(--ey-yellow);
+    border: 1px solid rgba(255, 230, 0, 0.4);
 }
 
 .manager-panel {
