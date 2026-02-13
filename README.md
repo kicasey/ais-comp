@@ -78,23 +78,6 @@ dotnet run
 
 The app starts at `http://localhost:5278`. On first run, it auto-migrates the database and seeds test users from `TestData/sample-logins.json`.
 
-### Test Logins
-
-All employees use password `Test123!`:
-
-| Email | Name |
-|-------|------|
-| jchen@crimson.ua.edu | James Chen |
-| smartinez@crimson.ua.edu | Sarah Martinez |
-| mjohnson@crimson.ua.edu | Marcus Johnson |
-| enguyen@crimson.ua.edu | Emily Nguyen |
-| dpark@crimson.ua.edu | David Park |
-| athompson@crimson.ua.edu | Alexandra Thompson |
-| mrodriguez@crimson.ua.edu | Michael Rodriguez |
-| jwilliams@crimson.ua.edu | Jessica Williams |
-| rkim@crimson.ua.edu | Robert Kim |
-| rfoster@crimson.ua.edu | Rachel Foster |
-
 ### Configuration
 
 Main config is in `appsettings.json` / `appsettings.Development.json`:
@@ -102,9 +85,7 @@ Main config is in `appsettings.json` / `appsettings.Development.json`:
 | Key | Description |
 |-----|-------------|
 | `ConnectionStrings:DefaultConnection` | Database connection string |
-| `ResumeApi:BaseUrl` | resume-api URL (e.g. `https://resume-api.campbellthompson.com`) |
 | `JWT:SecretKey` | JWT signing key |
-| `OpenAI:ApiKey` | OpenAI API key (placeholder) |
 
 ### Database Migrations
 
