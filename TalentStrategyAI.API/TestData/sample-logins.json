@@ -3,52 +3,73 @@
   "logins": [
     {
       "userId": "emp-1",
-      "email": "alex.chen@ey.com",
+      "email": "jchen@crimson.ua.edu",
       "password": "Test123!",
       "role": "employee",
-      "displayName": "Alex Chen"
+      "displayName": "James Chen"
     },
     {
       "userId": "emp-2",
-      "email": "jordan.smith@ey.com",
+      "email": "smartinez@crimson.ua.edu",
       "password": "Test123!",
       "role": "employee",
-      "displayName": "Jordan Smith"
+      "displayName": "Sarah Martinez"
     },
     {
       "userId": "emp-3",
-      "email": "sam.williams@ey.com",
+      "email": "mjohnson@crimson.ua.edu",
       "password": "Test123!",
       "role": "employee",
-      "displayName": "Sam Williams"
+      "displayName": "Marcus Johnson"
     },
     {
       "userId": "emp-4",
-      "email": "casey.brown@ey.com",
+      "email": "enguyen@crimson.ua.edu",
       "password": "Test123!",
       "role": "employee",
-      "displayName": "Casey Brown"
+      "displayName": "Emily Nguyen"
     },
     {
       "userId": "emp-5",
-      "email": "morgan.lee@ey.com",
+      "email": "dpark@crimson.ua.edu",
       "password": "Test123!",
       "role": "employee",
-      "displayName": "Morgan Lee"
+      "displayName": "David Park"
     },
     {
-      "userId": "mgr-1",
-      "email": "taylor.johnson@ey.com",
-      "password": "Manager1!",
-      "role": "manager",
-      "displayName": "Taylor Johnson"
+      "userId": "emp-6",
+      "email": "athompson@crimson.ua.edu",
+      "password": "Test123!",
+      "role": "employee",
+      "displayName": "Alexandra Thompson"
     },
     {
-      "userId": "mgr-2",
-      "email": "riley.davis@ey.com",
-      "password": "Manager1!",
-      "role": "manager",
-      "displayName": "Riley Davis"
+      "userId": "emp-7",
+      "email": "mrodriguez@crimson.ua.edu",
+      "password": "Test123!",
+      "role": "employee",
+      "displayName": "Michael Rodriguez"
+    },
+    {
+      "userId": "emp-8",
+      "email": "jwilliams@crimson.ua.edu",
+      "password": "Test123!",
+      "role": "employee",
+      "displayName": "Jessica Williams"
+    },
+    {
+      "userId": "emp-9",
+      "email": "rkim@crimson.ua.edu",
+      "password": "Test123!",
+      "role": "employee",
+      "displayName": "Robert Kim"
+    },
+    {
+      "userId": "emp-10",
+      "email": "rfoster@crimson.ua.edu",
+      "password": "Test123!",
+      "role": "employee",
+      "displayName": "Rachel Foster"
     }
   ]
 }

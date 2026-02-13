@@ -587,6 +587,20 @@ body.page--landing .ey-logo-bottom {
 }
 .chat-message__text {
     color: var(--ey-text);
+    line-height: 1.5;
+}
+.chat-message__text p {
+    margin: 0 0 0.5rem 0;
+}
+.chat-message__text p:last-child {
+    margin-bottom: 0;
+}
+.chat-message__text strong {
+    font-weight: 600;
+    color: var(--ey-yellow);
+}
+.chat-message__text em {
+    font-style: italic;
 }
 .chat-message--assistant .chat-message__text {
     padding-left: 0.25rem;
@@ -600,9 +614,29 @@ body.page--landing .ey-logo-bottom {
 .chat-structured__question {
     margin-bottom: 0.75rem;
 }
+.chat-structured__message p,
+.chat-structured__question p {
+    margin: 0 0 0.5rem 0;
+}
+.chat-structured__message p:last-child,
+.chat-structured__question p:last-child {
+    margin-bottom: 0;
+}
+.chat-structured__message strong,
+.chat-structured__question strong {
+    font-weight: 600;
+    color: var(--ey-yellow);
+}
 .chat-structured__question {
     color: var(--ey-text-muted);
     font-size: 0.95em;
+}
+.chat-structured__candidates li p {
+    margin: 0.25rem 0 0 0;
+    display: inline;
+}
+.chat-structured__candidates li strong {
+    color: var(--ey-yellow);
 }
 .chat-structured__candidates {
     margin-top: 0.75rem;

@@ -104,7 +104,7 @@ public class ChatController : ControllerBase
                    "When the resume-api is connected, AI will provide a detailed explanation of strengths and gaps.\n\n" +
                    "**Upskilling suggestions:**\n• Complete relevant EY learning modules for the role.\n• Shadow a current team member in this function.\n• Consider certification or training in key areas identified in the job description.";
         }
-        return "The AI assistant could not be reached. Check that ResumeApi:BaseUrl points to resume-api.campbellthompson.com and that the API is running. You can also check the server logs for details.";
+        return "The AI assistant could not be reached. Recommendations below may show sample or saved data instead.";
     }
 
     private static string? TryParseResponseText(string json)

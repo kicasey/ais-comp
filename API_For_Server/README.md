@@ -98,4 +98,6 @@ Manager chat and “Explain match” go: **browser → TalentStrategyAI → resu
    ```
    If n8n doesn’t return that, the site falls back to **TalentStrategyAI** `GET /api/jobs/{jobId}/recommendations` (MySQL or sample data), so the list still fills.
 
-**Without n8n:** Manager chat still works: TalentStrategyAI returns a short fallback message. Recommendations show from MySQL or TestData via the fallback above.
+**Employee chat (Ask EY's Talent Manager on the employee view):** Uses a separate webhook so employees get different presets (e.g. match to roles, suggest upskilling). Configure `Webhooks__EmployeeChat` (e.g. `http://n8n:5678/webhook/employee-chat`). The workflow must **Respond to Webhook** with JSON, e.g. `{ "response": "Your match summary and upskilling suggestions..." }`. If the webhook returns an empty body, the API returns a generic “assistant did not return a response” message.
+
+**Without n8n:** Manager chat still works: TalentStrategyAI returns a short fallback message. Recommendations show from MySQL or TestData via the fallback above. Employee chat shows “The assistant did not return a response” until the employee-chat webhook is set up and returns JSON.

@@ -458,7 +458,7 @@ function setupChatSendButtons() {
         var loadingId = 'loading-' + Date.now();
         appendChatMessage(messagesEl, 'Assistant', '…', 'assistant', true, loadingId);
         var headers = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
-        var chatUrl = (endpoint === '/api/chat') ? '/api/chat' : (RESUME_API_BASE + endpoint);
+        var chatUrl = (endpoint === '/api/chat' || endpoint === '/api/employee-chat') ? endpoint : (RESUME_API_BASE + endpoint);
         fetch(chatUrl, {
             method: 'POST',
             headers: headers,
@@ -478,12 +478,14 @@ function setupChatSendButtons() {
                     appendChatMessage(messagesEl, 'Assistant', 'No response received. You may need to upload your resume first.', 'assistant');
                     return;
                 }
+                var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
                 var structured = formatResumeApiStructuredBlock(data);
                 if (structured) {
                     appendChatMessage(messagesEl, 'Assistant', structured, 'assistant', false, undefined, true);
                 } else {
-                    var responseText = (data && data.response) ? data.response : (data && data.message) ? data.message : 'Done.';
-                    appendChatMessage(messagesEl, 'Assistant', responseText, 'assistant');
+                    var responseText = (item && item.response) ? item.response : (item && item.message) ? item.message : (typeof item === 'string') ? item : 'Done.';
+                    responseText = replaceIdsWithNames(responseText, data);
+                    appendChatMessage(messagesEl, 'Assistant', formatChatMessageMarkdown(fixSpacing(responseText)), 'assistant', false, undefined, true);
                 }
             })
             .catch(function (err) {
@@ -516,7 +518,7 @@ function setupChatSendButtons() {
 function sendPresetAndShowResponse(preset, messagesEl, chatEndpoint) {
     var endpoint = chatEndpoint || '/api/chat';
     var auth = getStoredAuth();
-    var payload = { preset: preset };
+    var payload = { preset: preset, customText: getPresetLabel(preset) };
     if (auth) {
         payload.userEmail = auth.email || '';
         payload.userName = auth.displayName || '';
@@ -527,7 +529,7 @@ function sendPresetAndShowResponse(preset, messagesEl, chatEndpoint) {
     appendChatMessage(messagesEl, 'Assistant', '…', 'assistant', true, loadingId);
 
     var headers = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
-    var chatUrl = (endpoint === '/api/chat') ? '/api/chat' : (RESUME_API_BASE + endpoint);
+    var chatUrl = (endpoint === '/api/chat' || endpoint === '/api/employee-chat') ? endpoint : (RESUME_API_BASE + endpoint);
     fetch(chatUrl, {
         method: 'POST',
         headers: headers,
@@ -547,13 +549,14 @@ function sendPresetAndShowResponse(preset, messagesEl, chatEndpoint) {
                 appendChatMessage(messagesEl, 'Assistant', 'No response received. You may need to upload your resume first.', 'assistant');
                 return;
             }
+            var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
             var structured = formatResumeApiStructuredBlock(data);
             if (structured) {
                 appendChatMessage(messagesEl, 'Assistant', structured, 'assistant', false, undefined, true);
             } else {
-                var text = (data && data.response) ? data.response : (data && data.message) ? data.message : (typeof data === 'string') ? data : 'Done.';
+                var text = (item && item.response) ? item.response : (item && item.message) ? item.message : (typeof item === 'string') ? item : 'Done.';
                 text = replaceIdsWithNames(text, data);
-                appendChatMessage(messagesEl, 'Assistant', fixSpacing(text), 'assistant');
+                appendChatMessage(messagesEl, 'Assistant', formatChatMessageMarkdown(fixSpacing(text)), 'assistant', false, undefined, true);
             }
         })
         .catch(function (err) {
@@ -639,19 +642,19 @@ function formatResumeApiStructuredBlock(data) {
 
     if (!msg && !question && (!candidates || !candidates.length)) return null;
     var html = '';
-    if (msg) { msg = replaceIdsWithNames(msg, data); html += '<p class="chat-structured__message">' + escapeHtml(fixSpacing(msg)) + '</p>'; }
-    if (question) html += '<p class="chat-structured__question"><strong>Clarifying:</strong> ' + escapeHtml(fixSpacing(question)) + '</p>';
+    if (msg) { msg = replaceIdsWithNames(msg, data); html += '<div class="chat-structured__message">' + formatChatMessageMarkdown(fixSpacing(msg)) + '</div>'; }
+    if (question) html += '<div class="chat-structured__question"><strong>Clarifying:</strong> ' + formatChatMessageMarkdown(fixSpacing(question)) + '</div>';
     if (candidates && candidates.length > 0) {
         html += '<div class="chat-structured__candidates"><strong>Top candidates</strong><ul>';
         for (var i = 0; i < candidates.length; i++) {
             var c = candidates[i];
             var name = (c.candidate_name || c.display || 'Unknown').toString();
             var score = c.score != null ? c.score + '%' : '';
-            var reason = (c.reason || '').toString().slice(0, 150);
-            if (reason.length === 150) reason += '…';
+            var reason = (c.reason || '').toString();
+            reason = reason ? formatChatMessageMarkdown(fixSpacing(replaceIdsWithNames(reason, data))) : '';
             html += '<li><span class="chat-structured__name">' + escapeHtml(name) + '</span>' +
                 (score ? ' <span class="chat-structured__score">' + escapeHtml(score) + '</span>' : '') +
-                (reason ? ' — ' + escapeHtml(reason) : '') + '</li>';
+                (reason ? ' — ' + reason : '') + '</li>';
         }
         html += '</ul></div>';
     }
@@ -695,6 +698,19 @@ function fixSpacing(text) {
     s = s.replace(/([a-z])(\d)/g, '$1 $2');
     s = s.replace(/(\d)([a-z])/g, '$1 $2');
     return s;
+}
+
+// Convert markdown-style assistant text to safe HTML (escape first, then **bold**, *italic*, newlines, lists)
+function formatChatMessageMarkdown(text) {
+    if (!text) return '';
+    var s = escapeHtml(text);
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    s = s.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    s = s.replace(/_([^_]+)_/g, '<em>$1</em>');
+    s = s.replace(/\n\n+/g, '</p><p>');
+    s = s.replace(/\n/g, '<br>');
+    return '<p>' + s + '</p>';
 }
 
 // ----- Manager flow: jobs list → job panel → recommend employees → employee popout (AI explanation) -----
@@ -943,8 +959,7 @@ function setupManagerFlow() {
                         renderCandidates(candidates);
                         return;
                     }
-                    // If AI returned text but no candidates, show a friendly message
-                    // Don't dump raw JSON — check if the response is just a JSON blob with empty candidates
+                    // If AI returned text but no candidates, show message
                     if (item && item.response) {
                         var respText = item.response;
                         try {
@@ -953,7 +968,7 @@ function setupManagerFlow() {
                                 recommendationsListEl.innerHTML = '<p class="placeholder-text">No matching candidates found for this role.</p>';
                                 return;
                             }
-                        } catch (e) { /* not JSON, show as text */ }
+                        } catch (e) { /* not JSON */ }
                         recommendationsListEl.innerHTML = '<p class="placeholder-text">' + escapeHtml(respText) + '</p>';
                         return;
                     }

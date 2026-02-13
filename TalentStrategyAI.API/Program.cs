@@ -96,12 +96,13 @@ app.UseStaticFiles();
 // Map controllers
 app.MapControllers();
 
-// Seed test users from TestData/sample-logins.json if database is empty
+// Seed test users from TestData/sample-logins.json (add missing; in Dev, sync passwords)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    await DataSeeder.SeedAsync(db, logger);
+    var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+    await DataSeeder.SeedAsync(db, logger, env.IsDevelopment());
 }
 
 app.Run();
