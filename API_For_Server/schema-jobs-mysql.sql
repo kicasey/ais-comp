@@ -4,10 +4,10 @@
 USE resume_ai;
 
 CREATE TABLE IF NOT EXISTS jobs (
-  id VARCHAR(64) NOT NULL PRIMARY KEY,
-  title VARCHAR(255) DEFAULT '',
-  department VARCHAR(128) DEFAULT '',
-  location VARCHAR(128) DEFAULT '',
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(500) NOT NULL,
+  department VARCHAR(200) NOT NULL DEFAULT '',
+  location VARCHAR(200) NOT NULL DEFAULT '',
   description TEXT
 );
 

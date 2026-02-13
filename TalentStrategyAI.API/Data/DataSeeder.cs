@@ -117,6 +117,50 @@ public static class DataSeeder
 
         if (added > 0 || synced > 0)
             logger.LogInformation("Sample logins: added {Added}, password-synced {Synced} ({Total} in file).", added, synced, logins.Count);
+
+        await SeedJobsIfEmptyAsync(db, logger);
+    }
+
+    private static async Task SeedJobsIfEmptyAsync(AppDbContext db, ILogger logger)
+    {
+        try
+        {
+            if (await db.Jobs.AnyAsync())
+                return;
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 1 && ex.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase))
+        {
+            await db.Database.ExecuteSqlRawAsync(
+                @"CREATE TABLE IF NOT EXISTS ""Jobs"" (""Id"" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, ""Title"" TEXT NOT NULL, ""Department"" TEXT NOT NULL, ""Location"" TEXT NOT NULL, ""Description"" TEXT NOT NULL, ""CreatedAt"" TEXT NOT NULL);");
+        }
+        var baseDir = AppContext.BaseDirectory;
+        var testDataDir = Path.Combine(baseDir, "TestData");
+        if (!Directory.Exists(testDataDir))
+            testDataDir = Path.Combine(Directory.GetCurrentDirectory(), "TestData");
+        var jobsPath = Path.Combine(testDataDir, "sample-jobs.json");
+        if (!System.IO.File.Exists(jobsPath))
+            return;
+        try
+        {
+            var json = await System.IO.File.ReadAllTextAsync(jobsPath);
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("jobs", out var arr))
+                return;
+            foreach (var j in arr.EnumerateArray())
+            {
+                var title = j.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "";
+                var dept = j.TryGetProperty("department", out var d) ? d.GetString() ?? "" : "";
+                var loc = j.TryGetProperty("location", out var locProp) ? locProp.GetString() ?? "" : "";
+                var desc = j.TryGetProperty("description", out var descProp) ? descProp.GetString() ?? "" : "";
+                db.Jobs.Add(new Job { Title = title, Department = dept, Location = loc, Description = desc, CreatedAt = DateTime.UtcNow });
+            }
+            await db.SaveChangesAsync();
+            logger.LogInformation("Seeded {Count} jobs from sample-jobs.json.", arr.GetArrayLength());
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not seed jobs from sample-jobs.json.");
+        }
     }
 
     private class SampleLogin

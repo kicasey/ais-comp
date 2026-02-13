@@ -1,103 +1,156 @@
 # Resume API (resume-api.campbellthompson.com)
 
-Proxy API for the TalentStrategyAI website. Authenticates with Client ID/Secret and forwards:
+Proxy API for the TalentStrategyAI website. Sits between the frontend and n8n/MySQL — handles chat, resume uploads, jobs, recommendations, and candidate name lookups.
 
-- **Chat** → `POST /api/chat` → n8n webhook `http://192.168.1.161:5678/webhook/chat`
-- **Resumes** → `POST /api/resume/upload` → n8n webhook `http://192.168.1.161:5678/webhook/resumes`
-- **Jobs & recommendations** → `GET /api/jobs`, `GET /api/jobs/{id}`, `GET /api/jobs/{jobId}/recommendations` → MySQL on same Docker network
+## Endpoints
 
-## Auth (website → API)
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/chat` | Manager chat → forwards to n8n webhook |
+| `POST` | `/api/employee-chat` | Employee chat → forwards to n8n webhook |
+| `POST` | `/api/resume/upload` | Resume upload (multipart/form-data) → saves file + forwards to n8n |
+| `GET` | `/api/jobs` | List all jobs from MySQL |
+| `GET` | `/api/jobs/{id}` | Get a single job |
+| `POST` | `/api/jobs` | Create a job in MySQL |
+| `PUT` | `/api/jobs/{id}` | Update a job |
+| `DELETE` | `/api/jobs/{id}` | Delete a job |
+| `GET` | `/api/jobs/{jobId}/recommendations` | Get candidate recommendations for a job (joins `job_recommendations` + `resume_pii`) |
+| `GET` | `/api/names` | Returns `{ "resume_id": "candidate_name" }` map from `resume_pii` table |
+| `GET` | `/health` | Health check |
 
-Every request must include either:
+## How it connects
 
-1. **Headers:** `X-Client-Id`, `X-Client-Secret`
-2. **Basic:** `Authorization: Basic base64(clientId:clientSecret)`
+```
+Browser → TalentStrategyAI.API → resume-api → n8n (webhooks)
+                                            → MySQL (jobs, recommendations, resume_pii)
+                                            → Gotenberg (PDF conversion)
+                                            → /data/incoming-resumes (file storage)
+```
 
-Set in config or env:
+## Configuration
 
-- `ClientAuth:ClientId`
-- `ClientAuth:ClientSecret`
+All config is in `appsettings.json` or overridden via environment variables at runtime.
 
-(Use env vars in production, e.g. `ClientAuth__ClientId`, `ClientAuth__ClientSecret`.)
+| Config Key | Env Var | Description |
+|------------|---------|-------------|
+| `ConnectionStrings:ResumeDb` | `ConnectionStrings__ResumeDb` | MySQL connection string |
+| `Webhooks:Chat` | `Webhooks__Chat` | n8n webhook URL for manager chat |
+| `Webhooks:EmployeeChat` | `Webhooks__EmployeeChat` | n8n webhook URL for employee chat |
+| `Webhooks:Resumes` | `Webhooks__Resumes` | n8n webhook URL for resume processing |
+| `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | Allowed CORS origins |
+| `Gotenberg:BaseUrl` | `Gotenberg__BaseUrl` | Gotenberg service URL for PDF→text |
+| `Resume:SavePath` | `Resume__SavePath` | Directory to save uploaded resumes |
+| `MySQL:JobsTable` | `MySQL__JobsTable` | Jobs table name (default: `jobs`) |
+| `MySQL:RecommendationsTable` | `MySQL__RecommendationsTable` | Recommendations table name (default: `job_recommendations`) |
+| `MySQL:ResumePiiTable` | `MySQL__ResumePiiTable` | Resume PII table name (default: `resume_pii`) |
 
-## Contract (matches main site)
-
-- **Chat:** `POST /api/chat`, body JSON `{ "preset": "...", "customText": "..." }`. Response passed through from n8n (site expects `{ "response": "..." }`).
-- **Resume:** `POST /api/resume/upload`, `multipart/form-data`: `resume` (file), `candidateName` (string). Response passed through from n8n.
-
-## Hosting (resume-api.campbellthompson.com)
-
-Run behind your reverse proxy (e.g. nginx/Caddy) with HTTPS for `resume-api.campbellthompson.com`. Point the site’s `fetch` base URL to `https://resume-api.campbellthompson.com` and send the same Client ID/Secret in headers (or Basic) on each request.
-
-## Build & run (local)
+## Build & Run (Local)
 
 ```bash
 cd API_For_Server
 dotnet run
 ```
 
-## Docker (build here, run on server)
+## Docker (Build → Transfer → Deploy)
 
-**Build** (from repo root or from `API_For_Server`):
+**1. Build the image:**
 
 ```bash
 cd API_For_Server
-docker build -t resume-api .
+docker build --no-cache -t resume-api:latest .
 ```
 
-**Save image** to copy to server (no registry):
+**2. Save and transfer to server:**
 
 ```bash
-docker save resume-api:latest | gzip > resume-api.tar.gz
-# copy resume-api.tar.gz to server, then on server:
-# gunzip -c resume-api.tar.gz | docker load
+cd ~/AIS/Main/ais-comp
+docker save -o resume-api.tar resume-api:latest
+scp resume-api.tar root@Helios:/root/
 ```
 
-**Run on server** (set env vars for auth and webhook URLs; container listens on 8080):
+**3. Deploy on server:**
 
 ```bash
+ssh root@Helios
+
+docker load -i /root/resume-api.tar
+docker stop resume-api && docker rm resume-api
+
 docker run -d --name resume-api \
   --network resume_net \
   -p 8080:8080 \
   -v /mnt/cache/appdata/n8n-files/AIS-data/incoming-resumes:/data/incoming-resumes \
-  -e Webhooks__Chat="http://n8n:5678/webhook/chat" \
-  -e Webhooks__EmployeeChat="http://n8n:5678/webhook/employee-chat" \
-  -e Webhooks__Resumes="http://n8n:5678/webhook/resume-input" \
-  -e ConnectionStrings__ResumeDb="..." \
-  -e Gotenberg__BaseUrl="http://gotenberg:3000" \
+  -e ASPNETCORE_ENVIRONMENT=Production \
+  -e "ConnectionStrings__ResumeDb=Server=mysql;Port=3306;Database=resume_ai;User=root;Password=YOUR_PASSWORD;AllowUserVariables=True" \
+  -e "Webhooks__Chat=http://n8n:5678/webhook/chat" \
+  -e "Webhooks__EmployeeChat=http://n8n:5678/webhook/employee-chat" \
+  -e "Webhooks__Resumes=http://n8n:5678/webhook/resume-input" \
+  -e "Cors__AllowedOrigins__0=https://campbellthompson.com" \
+  -e "Gotenberg__BaseUrl=http://gotenberg:3000" \
   resume-api:latest
 ```
 
 Point your reverse proxy at `localhost:8080` for `resume-api.campbellthompson.com`.
 
-## MySQL (jobs & recommendations)
+## MySQL Schema
 
-Resume-api reads **jobs** and **job_recommendations** from MySQL (same Docker network; container name `MySQL`). Set the connection string via env:
+Resume-api reads/writes to MySQL database `resume_ai`. All tables must exist before use.
 
-- `ConnectionStrings__ResumeDb` = `Server=MySQL;Port=3306;Database=resume_ai;User=...;Password=...`
+### `jobs`
 
-Expected schema (see `schema-jobs-mysql.sql`):
+```sql
+CREATE TABLE IF NOT EXISTS jobs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(500) NOT NULL,
+  department VARCHAR(200) NOT NULL DEFAULT '',
+  location VARCHAR(200) NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT ''
+);
+```
 
-- **jobs**: `id`, `title`, `department`, `location`, `description`
-- **job_recommendations**: `job_id`, `resume_id`, `score` (join to `resume_pii.resume_id` / `candidate_name` for names)
+### `resume_pii`
 
-If the connection string is missing or MySQL is down, jobs and recommendations endpoints return empty arrays.
+Stores candidate names mapped to resume IDs (populated by the resume upload/processing pipeline).
 
-## Getting chat to work (n8n)
+| Column | Type | Description |
+|--------|------|-------------|
+| `resume_id` | VARCHAR | Unique resume identifier (UUID) |
+| `candidate_name` | VARCHAR | Candidate's display name |
 
-Manager chat and “Explain match” go: **browser → TalentStrategyAI → resume-api → n8n**. Recommendations try resume-api chat first, then fall back to TalentStrategyAI `GET /api/jobs/{id}/recommendations` (MySQL/TestData).
+### `job_recommendations`
 
-1. **Run n8n** so resume-api can reach it (e.g. same Docker network: `Webhooks__Chat="http://n8n:5678/webhook/chat"`, or LAN IP in appsettings).
-2. **Create a webhook workflow** in n8n:
-   - **Trigger:** Webhook, HTTP method POST, path `/webhook/chat` (so full URL is `http://<n8n-host>:5678/webhook/chat`).
-   - **Body:** JSON from the site, e.g. `preset`, `customText`, `jobId`, `employeeId`, `userEmail`, `userName`, `userId`.
-   - **Response:** Must return JSON with at least one of: `response`, `message`, `text`, or `content` (string). Example: `{ "response": "Here’s why this employee matches..." }`.
-3. **Recommendations (AI):** The “Recommend employees” button calls resume-api `/api/chat` with `preset: "recommend_for_job"`. To get AI-driven candidates, add a branch or second webhook in n8n that returns JSON like:
-   ```json
-   { "top_candidates": [ { "candidate_name": "Jane Doe", "resume_id": "r-1", "score": 92 } ] }
-   ```
-   If n8n doesn’t return that, the site falls back to **TalentStrategyAI** `GET /api/jobs/{jobId}/recommendations` (MySQL or sample data), so the list still fills.
+Stores AI-generated candidate-to-job match scores.
 
-**Employee chat (Ask EY's Talent Manager on the employee view):** Uses a separate webhook so employees get different presets (e.g. match to roles, suggest upskilling). Configure `Webhooks__EmployeeChat` (e.g. `http://n8n:5678/webhook/employee-chat`). The workflow must **Respond to Webhook** with JSON, e.g. `{ "response": "Your match summary and upskilling suggestions..." }`. If the webhook returns an empty body, the API returns a generic “assistant did not return a response” message.
+| Column | Type | Description |
+|--------|------|-------------|
+| `job_id` | VARCHAR | References a job |
+| `resume_id` | VARCHAR | References a resume in `resume_pii` |
+| `score` | INT | Match score (0–100) |
 
-**Without n8n:** Manager chat still works: TalentStrategyAI returns a short fallback message. Recommendations show from MySQL or TestData via the fallback above. Employee chat shows “The assistant did not return a response” until the employee-chat webhook is set up and returns JSON.
+See `schema-jobs-mysql.sql` for the full schema.
+
+## n8n Webhooks
+
+### Manager Chat (`POST /api/chat`)
+
+- **Receives:** `{ "preset": "...", "customText": "...", "jobId": "...", "employeeId": "...", "userEmail": "...", "userName": "...", "userId": "..." }`
+- **Must return:** JSON with at least one of: `response`, `message`, `text`, or `content` (string).
+- For recommendations, return: `{ "top_candidates": [{ "candidate_name": "...", "resume_id": "...", "score": 85, "strengths": [...], "gaps": [...], "reason": "..." }] }`
+- Optionally include `"id_to_name": { "resume-uuid": "Real Name" }` to map resume IDs to names in chat text.
+
+### Employee Chat (`POST /api/employee-chat`)
+
+- Same request/response format as manager chat, but with employee-specific presets (match to roles, suggest upskilling).
+
+### Resume Upload (`POST /api/resume/upload`)
+
+- Receives `multipart/form-data` with `resume` (file) and `candidateName` (string).
+- Saves the file to `/data/incoming-resumes` (mapped via Docker volume).
+- Forwards metadata to the n8n resumes webhook.
+
+## Without n8n
+
+- **Chat:** Returns a fallback message from TalentStrategyAI.
+- **Recommendations:** Falls back to `GET /api/jobs/{id}/recommendations` (MySQL data or test data).
+- **Resume upload:** File is saved but no processing occurs.
+- **Names:** Still works (reads directly from MySQL `resume_pii`).

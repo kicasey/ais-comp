@@ -7,11 +7,19 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/styles.css?v=3">
+    <link rel="stylesheet" href="css/styles.css?v=4">
+    <script>
+        (function(){var t=localStorage.getItem('talentStrategyTheme');if(t&&t!=='dark')document.documentElement.setAttribute('data-theme',t);})();
+    </script>
 </head>
 <body class="page--landing">
-    <!-- EY logo: top right on landing only -->
+    <!-- EY logo + theme toggle: top right on landing only -->
     <div class="ey-logo-top" aria-hidden="true">
+        <button type="button" class="theme-toggle" id="theme-toggle-landing" aria-label="Toggle light/dark mode">
+            <span class="theme-toggle__track">
+                <span class="theme-toggle__thumb"></span>
+            </span>
+        </button>
         <img src="images/ey-logo.svg" alt="EY" class="ey-logo-img">
     </div>
 
@@ -94,6 +102,11 @@
                 <p class="tagline">EY Talent Match</p>
             </div>
             <div class="header-auth">
+                <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle light/dark mode">
+                    <span class="theme-toggle__track">
+                        <span class="theme-toggle__thumb"></span>
+                    </span>
+                </button>
                 <span class="header-user" id="header-user" style="display: none;"></span>
                 <button type="button" class="btn-login" id="btn-login-app" aria-label="Login">Login</button>
                 <button type="button" class="btn-logout" id="btn-logout" aria-label="Log out" style="display: none;">Log out</button>
@@ -109,22 +122,25 @@
                         <form id="resume-upload-form" class="upload-form upload-form--compact">
                             <div class="upload-form-row">
                                 <div class="form-group form-group--inline form-group--file">
-                                    <label for="resume-file" class="file-input-label" id="resume-file-label">Choose file...</label>
-                                    <input type="file" id="resume-file" name="resume" accept=".pdf,.doc,.docx" class="file-input-native">
+                                    <div class="file-row">
+                                        <label for="resume-file" class="file-input-label" id="resume-file-label">Choose file...</label>
+                                        <input type="file" id="resume-file" name="resume" accept=".pdf,.doc,.docx" class="file-input-native">
+                                        <button type="submit" class="submit-btn submit-btn--compact" id="submit-btn">
+                                            <span class="btn-text">Upload</span>
+                                            <span class="btn-loader" style="display: none;">Uploading...</span>
+                                        </button>
+                                    </div>
                                     <small class="file-info">PDF, DOC, DOCX (max 10MB)</small>
                                 </div>
-                                <div class="form-group form-group--inline">
-                                    <label for="candidate-name" class="sr-only">Your name</label>
-                                    <input type="text" id="candidate-name" name="candidateName" placeholder="Your name" required>
-                                </div>
-                                <button type="submit" class="submit-btn submit-btn--compact" id="submit-btn">
-                                    <span class="btn-text">Upload</span>
-                                    <span class="btn-loader" style="display: none;">Uploading...</span>
-                                </button>
                             </div>
                         </form>
                         <div id="upload-message" class="message" style="display: none;"></div>
                     </section>
+
+                    <div id="last-upload-box" class="last-upload-box" style="display: none;">
+                        <span class="last-upload-box__label">Last file uploaded</span>
+                        <span class="last-upload-box__detail" id="last-upload-detail"></span>
+                    </div>
 
                     <section class="match-section" aria-label="Your match by role">
                         <h2 class="section-title">Your match by role</h2>
@@ -156,6 +172,7 @@
                     <div class="manager-layout">
                         <div class="manager-main">
                             <h2 class="section-title">Open job postings</h2>
+                            <button type="button" class="btn-add-job" id="btn-add-job" aria-label="Add job">+ Add job</button>
                             <div id="manager-jobs-list" class="jobs-list" aria-live="polite"><p class="placeholder-text">Loading job postings…</p></div>
                             <div id="manager-recommendations-wrap" class="recommendations-wrap" style="display: none;">
                                 <h2 class="section-title">Recommended employees <span id="manager-recommendations-job-title" class="section-title-sub"></span></h2>
@@ -166,6 +183,10 @@
                             <div class="manager-panel-inner">
                                 <button type="button" class="manager-panel-close" id="manager-panel-close" aria-label="Close panel">×</button>
                                 <div id="manager-job-detail" class="manager-job-detail"></div>
+                                <div id="manager-job-actions" class="manager-job-actions" style="display: none;">
+                                    <button type="button" class="btn-edit-job" id="btn-edit-job">Edit</button>
+                                    <button type="button" class="btn-delete-job" id="btn-delete-job">Delete</button>
+                                </div>
                                 <button type="button" class="btn-recommend-employees" id="btn-recommend-employees">Recommend employees</button>
                             </div>
                         </aside>
@@ -197,6 +218,36 @@
             </main>
         </div>
     </section>
+
+    <!-- Job add/edit modal (manager) -->
+    <div id="manager-job-modal" class="job-form-modal job-form-modal--closed" aria-hidden="true" aria-label="Add or edit job">
+        <div class="job-form-modal-backdrop"></div>
+        <div class="job-form-modal-inner">
+            <h3 id="manager-job-modal-title" class="job-form-modal-title">Add job</h3>
+            <form id="manager-job-form" class="job-form">
+                <div class="form-group">
+                    <label for="job-form-title">Title <span class="required">*</span></label>
+                    <input type="text" id="job-form-title" name="title" required maxlength="500" placeholder="e.g. Senior Consultant – Technology">
+                </div>
+                <div class="form-group">
+                    <label for="job-form-department">Department</label>
+                    <input type="text" id="job-form-department" name="department" maxlength="200" placeholder="e.g. Technology">
+                </div>
+                <div class="form-group">
+                    <label for="job-form-location">Location</label>
+                    <input type="text" id="job-form-location" name="location" maxlength="200" placeholder="e.g. New York">
+                </div>
+                <div class="form-group">
+                    <label for="job-form-description">Description</label>
+                    <textarea id="job-form-description" name="description" rows="4" placeholder="Role requirements and responsibilities..."></textarea>
+                </div>
+                <div class="job-form-actions">
+                    <button type="button" class="btn-cancel-job-form" id="btn-cancel-job-form">Cancel</button>
+                    <button type="submit" class="btn-save-job" id="btn-save-job">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- EY logo: bottom right on chatbot (Employee/Manager) only -->
     <div class="ey-logo-bottom" aria-hidden="true">

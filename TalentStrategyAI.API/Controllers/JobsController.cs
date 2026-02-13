@@ -1,11 +1,14 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using TalentStrategyAI.API.Data;
+using TalentStrategyAI.API.Models;
 
 namespace TalentStrategyAI.API.Controllers;
 
 /// <summary>
 /// Open job postings and recommended employees. Tries resume-api first;
-/// if the API is not configured or fails, returns data from TestData (sample-jobs.json, sample-recommendations.json).
+/// then database (create/update/delete); then TestData fallback.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -15,17 +18,20 @@ public class JobsController : ControllerBase
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
     private readonly IWebHostEnvironment _env;
+    private readonly AppDbContext _db;
 
     public JobsController(
         ILogger<JobsController> logger,
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
-        IWebHostEnvironment env)
+        IWebHostEnvironment env,
+        AppDbContext db)
     {
         _logger = logger;
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
         _env = env;
+        _db = db;
     }
 
     [HttpGet]
@@ -33,10 +39,11 @@ public class JobsController : ControllerBase
     {
         var path = (_configuration["ResumeApi:JobsPath"] ?? "api/jobs").TrimStart('/');
         var (success, data) = await TryGetFromApiAsync<JobDto[]>(path);
-        if (success && data != null && data.Length > 0)
-        {
+        if (success && data != null)
             return Ok(data);
-        }
+        var dbJobs = await _db.Jobs.OrderBy(j => j.Id).ToListAsync();
+        if (dbJobs.Count > 0)
+            return Ok(dbJobs.Select(j => JobToDto(j)).ToArray());
         return Ok(await GetJobsFromTestDataAsync());
     }
 
@@ -50,10 +57,72 @@ public class JobsController : ControllerBase
         {
             return Ok(data);
         }
-        var job = await GetJobByIdFromTestDataAsync(id);
+        if (TryParseJobId(id, out var dbId))
+        {
+            var job = await _db.Jobs.FindAsync(dbId);
+            if (job != null)
+                return Ok(JobToDetailDto(job));
+        }
+        var testJob = await GetJobByIdFromTestDataAsync(id);
+        if (testJob == null)
+            return NotFound(new { message = "Job not found." });
+        return Ok(testJob);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateJob([FromBody] JobCreateRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request?.Title))
+            return BadRequest(new { message = "Title is required." });
+        var job = new Job
+        {
+            Title = request.Title.Trim(),
+            Department = (request.Department ?? "").Trim(),
+            Location = (request.Location ?? "").Trim(),
+            Description = (request.Description ?? "").Trim(),
+            CreatedAt = DateTime.UtcNow
+        };
+        _db.Jobs.Add(job);
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Created job {JobId} ({Title})", job.Id, job.Title);
+        await SyncJobToResumeApiAsync(JobToDetailDto(job), method: "POST", path: null);
+        return CreatedAtAction(nameof(GetJob), new { id = JobIdString(job.Id) }, JobToDetailDto(job));
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateJob(string id, [FromBody] JobCreateRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request?.Title))
+            return BadRequest(new { message = "Title is required." });
+        if (!TryParseJobId(id, out var dbId))
+            return NotFound(new { message = "Job not found." });
+        var job = await _db.Jobs.FindAsync(dbId);
         if (job == null)
             return NotFound(new { message = "Job not found." });
-        return Ok(job);
+        job.Title = request.Title.Trim();
+        job.Department = (request.Department ?? "").Trim();
+        job.Location = (request.Location ?? "").Trim();
+        job.Description = (request.Description ?? "").Trim();
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Updated job {JobId}", job.Id);
+        await SyncJobToResumeApiAsync(JobToDetailDto(job), method: "PUT", path: JobIdString(job.Id));
+        return Ok(JobToDetailDto(job));
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteJob(string id)
+    {
+        if (!TryParseJobId(id, out var dbId))
+            return NotFound(new { message = "Job not found." });
+        var job = await _db.Jobs.FindAsync(dbId);
+        if (job == null)
+            return NotFound(new { message = "Job not found." });
+        var idStr = JobIdString(job.Id);
+        _db.Jobs.Remove(job);
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Deleted job {JobId} ({Title})", job.Id, job.Title);
+        await SyncJobToResumeApiAsync(null, method: "DELETE", path: idStr);
+        return NoContent();
     }
 
     [HttpGet("{jobId}/recommendations")]
@@ -69,6 +138,35 @@ public class JobsController : ControllerBase
         }
         return Ok(Array.Empty<EmployeeMatchDto>());
     }
+
+    private static bool TryParseJobId(string id, out int dbId)
+    {
+        dbId = 0;
+        if (string.IsNullOrEmpty(id)) return false;
+        var s = id.TrimStart();
+        if (s.StartsWith("job-", StringComparison.OrdinalIgnoreCase))
+            s = s.Substring(4);
+        return int.TryParse(s, out dbId) && dbId > 0;
+    }
+
+    private static string JobIdString(int id) => "job-" + id;
+
+    private static JobDto JobToDto(Job j) => new JobDto
+    {
+        Id = JobIdString(j.Id),
+        Title = j.Title,
+        Department = j.Department,
+        Location = j.Location
+    };
+
+    private static JobDetailDto JobToDetailDto(Job j) => new JobDetailDto
+    {
+        Id = JobIdString(j.Id),
+        Title = j.Title,
+        Department = j.Department,
+        Location = j.Location,
+        Description = j.Description
+    };
 
     private async Task<(bool Success, T? Data)> TryGetFromApiAsync<T>(string path) where T : class
     {
@@ -90,6 +188,41 @@ public class JobsController : ControllerBase
         {
             _logger.LogWarning(ex, "Resume API request failed for {Path}", path);
             return (false, null);
+        }
+    }
+
+    private async Task SyncJobToResumeApiAsync(JobDetailDto? job, string method, string? path)
+    {
+        var baseUrl = _configuration["ResumeApi:BaseUrl"];
+        if (string.IsNullOrWhiteSpace(baseUrl)) return;
+        var jobsPath = (_configuration["ResumeApi:JobsPath"] ?? "api/jobs").TrimStart('/');
+        var fullPath = string.IsNullOrEmpty(path) ? jobsPath : $"{jobsPath.TrimEnd('/')}/{Uri.EscapeDataString(path)}";
+        try
+        {
+            var client = _httpClientFactory.CreateClient("ResumeApi");
+            HttpResponseMessage response;
+            if (method == "POST" && job != null)
+            {
+                var payload = new { job.Title, job.Department, job.Location, job.Description };
+                response = await client.PostAsJsonAsync(fullPath, payload);
+            }
+            else if (method == "PUT" && job != null)
+            {
+                var payload = new { job.Title, job.Department, job.Location, job.Description };
+                response = await client.PutAsJsonAsync(fullPath, payload);
+            }
+            else if (method == "DELETE")
+            {
+                response = await client.DeleteAsync(fullPath);
+            }
+            else
+                return;
+            if (!response.IsSuccessStatusCode)
+                _logger.LogWarning("Resume API {Method} {Path} returned {Code}", method, fullPath, response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Resume API {Method} {Path} failed", method, fullPath);
         }
     }
 
@@ -246,5 +379,13 @@ public class JobsController : ControllerBase
         public string EmployeeId { get; set; } = "";
         public string Name { get; set; } = "";
         public int ConfidencePercent { get; set; }
+    }
+
+    public class JobCreateRequest
+    {
+        public string? Title { get; set; }
+        public string? Department { get; set; }
+        public string? Location { get; set; }
+        public string? Description { get; set; }
     }
 }

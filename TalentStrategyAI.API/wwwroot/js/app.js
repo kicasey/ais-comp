@@ -2,12 +2,35 @@
 
 var AUTH_STORAGE_KEY = 'talentStrategyAuth';
 var RESUME_API_BASE = 'https://resume-api.campbellthompson.com';
+var THEME_KEY = 'talentStrategyTheme';
+
+function initThemeToggle() {
+    var saved = localStorage.getItem(THEME_KEY);
+    if (saved && saved !== 'dark') document.documentElement.setAttribute('data-theme', saved);
+
+    function toggle() {
+        var current = document.documentElement.getAttribute('data-theme');
+        var next = current === 'light' ? 'dark' : 'light';
+        if (next === 'dark') {
+            document.documentElement.removeAttribute('data-theme');
+        } else {
+            document.documentElement.setAttribute('data-theme', next);
+        }
+        localStorage.setItem(THEME_KEY, next);
+    }
+
+    var btns = document.querySelectorAll('#theme-toggle, #theme-toggle-landing');
+    for (var i = 0; i < btns.length; i++) {
+        btns[i].addEventListener('click', toggle);
+    }
+}
 
 document.addEventListener('DOMContentLoaded', function () {
     initializeApp();
 });
 
 function initializeApp() {
+    initThemeToggle();
     ensureAuthGate();
     setupLanding();
     setupBackButton();
@@ -279,7 +302,7 @@ function setupAuth() {
     }
 
     var logoutBtn = document.getElementById('btn-logout');
-    if (logoutBtn) logoutBtn.addEventListener('click', function () { setStoredAuth(null); });
+    if (logoutBtn) logoutBtn.addEventListener('click', function () { clearChatDisplay(); setStoredAuth(null); });
 
     var btnLoginApp = document.getElementById('btn-login-app');
     if (btnLoginApp) btnLoginApp.addEventListener('click', function () {
@@ -304,6 +327,7 @@ function showAppByRole(role) {
     pageApp.classList.remove('page--hidden');
     document.body.classList.remove('page--landing');
     document.body.classList.add('page--app');
+    restoreChatHistory();
     var emp = document.getElementById('interface-employee');
     var mgr = document.getElementById('interface-manager');
     if (role === 'manager') {
@@ -314,6 +338,7 @@ function showAppByRole(role) {
     } else {
         if (emp) emp.classList.remove('interface--hidden');
         if (mgr) mgr.classList.add('interface--hidden');
+        showLastUpload();
     }
 }
 
@@ -376,14 +401,17 @@ function setupResumeUploadForm() {
         if (btnText) btnText.style.display = 'none';
         if (btnLoader) btnLoader.style.display = 'inline';
         submitBtn.disabled = true;
-        hideUploadMessage();
+        showUploadMessage('EY Talent Manager is reading your resume...', 'info');
 
         try {
             var formData = new FormData(form);
+            var auth = getStoredAuth();
+            formData.set('candidateName', (auth && auth.displayName) ? auth.displayName : 'Unknown');
             var response = await fetch(RESUME_API_BASE + '/api/resume/upload', { method: 'POST', body: formData });
             var result = await response.json();
             if (response.ok) {
-                showUploadMessage('Resume uploaded successfully!', 'success');
+                showUploadMessage('Completed!', 'success');
+                saveLastUpload(file.name);
                 form.reset();
                 fileLabel.textContent = 'Choose file...';
                 fileLabel.classList.remove('file-selected');
@@ -399,6 +427,35 @@ function setupResumeUploadForm() {
             if (btnLoader) btnLoader.style.display = 'none';
         }
     });
+}
+
+function saveLastUpload(fileName) {
+    var auth = getStoredAuth();
+    if (!auth || !auth.email) return;
+    var key = 'lastUpload_' + auth.email;
+    var info = { name: fileName, time: new Date().toISOString() };
+    localStorage.setItem(key, JSON.stringify(info));
+    showLastUpload();
+}
+
+function showLastUpload() {
+    var box = document.getElementById('last-upload-box');
+    var detail = document.getElementById('last-upload-detail');
+    if (!box || !detail) return;
+    var auth = getStoredAuth();
+    if (!auth || !auth.email) { box.style.display = 'none'; return; }
+    var raw = localStorage.getItem('lastUpload_' + auth.email);
+    if (!raw) { box.style.display = 'none'; return; }
+    try {
+        var info = JSON.parse(raw);
+        var d = new Date(info.time);
+        var dateStr = d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        var timeStr = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        detail.textContent = info.name + '  —  ' + dateStr + ' at ' + timeStr;
+        box.style.display = 'flex';
+    } catch (e) {
+        box.style.display = 'none';
+    }
 }
 
 function showUploadMessage(message, type) {
@@ -478,15 +535,17 @@ function setupChatSendButtons() {
                     appendChatMessage(messagesEl, 'Assistant', 'No response received. You may need to upload your resume first.', 'assistant');
                     return;
                 }
-                var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
-                var structured = formatResumeApiStructuredBlock(data);
-                if (structured) {
-                    appendChatMessage(messagesEl, 'Assistant', structured, 'assistant', false, undefined, true);
-                } else {
-                    var responseText = (item && item.response) ? item.response : (item && item.message) ? item.message : (typeof item === 'string') ? item : 'Done.';
-                    responseText = replaceIdsWithNames(responseText, data);
-                    appendChatMessage(messagesEl, 'Assistant', formatChatMessageMarkdown(fixSpacing(responseText)), 'assistant', false, undefined, true);
-                }
+                return fetchNameMap().then(function (nameMap) {
+                    var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
+                    var structured = formatResumeApiStructuredBlock(data, nameMap);
+                    if (structured) {
+                        appendChatMessage(messagesEl, 'Assistant', structured, 'assistant', false, undefined, true);
+                    } else {
+                        var responseText = (item && item.response) ? item.response : (item && item.message) ? item.message : (typeof item === 'string') ? item : 'Done.';
+                        responseText = replaceIdsWithNames(responseText, data, nameMap);
+                        appendChatMessage(messagesEl, 'Assistant', formatChatMessageMarkdown(fixSpacing(responseText)), 'assistant', false, undefined, true);
+                    }
+                });
             })
             .catch(function (err) {
                 removeLoadingMessage(messagesEl, loadingId);
@@ -549,15 +608,17 @@ function sendPresetAndShowResponse(preset, messagesEl, chatEndpoint) {
                 appendChatMessage(messagesEl, 'Assistant', 'No response received. You may need to upload your resume first.', 'assistant');
                 return;
             }
-            var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
-            var structured = formatResumeApiStructuredBlock(data);
-            if (structured) {
-                appendChatMessage(messagesEl, 'Assistant', structured, 'assistant', false, undefined, true);
-            } else {
-                var text = (item && item.response) ? item.response : (item && item.message) ? item.message : (typeof item === 'string') ? item : 'Done.';
-                text = replaceIdsWithNames(text, data);
-                appendChatMessage(messagesEl, 'Assistant', formatChatMessageMarkdown(fixSpacing(text)), 'assistant', false, undefined, true);
-            }
+            return fetchNameMap().then(function (nameMap) {
+                var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
+                var structured = formatResumeApiStructuredBlock(data, nameMap);
+                if (structured) {
+                    appendChatMessage(messagesEl, 'Assistant', structured, 'assistant', false, undefined, true);
+                } else {
+                    var text = (item && item.response) ? item.response : (item && item.message) ? item.message : (typeof item === 'string') ? item : 'Done.';
+                    text = replaceIdsWithNames(text, data, nameMap);
+                    appendChatMessage(messagesEl, 'Assistant', formatChatMessageMarkdown(fixSpacing(text)), 'assistant', false, undefined, true);
+                }
+            });
         })
         .catch(function (err) {
             removeLoadingMessage(messagesEl, loadingId);
@@ -588,9 +649,50 @@ function appendChatMessage(container, role, text, roleClass, isLoading, id, cont
     div.innerHTML = '<div class="chat-message__role">' + escapeHtml(role) + '</div><div class="chat-message__text">' + textHtml + '</div>';
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
+    if (!isLoading) saveChatHistory(container);
 }
 
-function formatResumeApiStructuredBlock(data) {
+function getChatStorageKey(containerId) {
+    var auth = getStoredAuth();
+    if (!auth || !auth.email) return null;
+    return 'chatHistory_' + auth.email + '_' + containerId;
+}
+
+function saveChatHistory(container) {
+    if (!container || !container.id) return;
+    var key = getChatStorageKey(container.id);
+    if (!key) return;
+    // Only save non-loading messages
+    var clone = container.cloneNode(true);
+    var loading = clone.querySelectorAll('.chat-message--loading');
+    for (var i = 0; i < loading.length; i++) clone.removeChild(loading[i]);
+    localStorage.setItem(key, clone.innerHTML);
+}
+
+function restoreChatHistory() {
+    var ids = ['chat-messages-employee', 'chat-messages-manager'];
+    for (var i = 0; i < ids.length; i++) {
+        var el = document.getElementById(ids[i]);
+        if (!el) continue;
+        var key = getChatStorageKey(ids[i]);
+        if (!key) continue;
+        var saved = localStorage.getItem(key);
+        if (saved) {
+            el.innerHTML = saved;
+            el.scrollTop = el.scrollHeight;
+        }
+    }
+}
+
+function clearChatDisplay() {
+    var ids = ['chat-messages-employee', 'chat-messages-manager'];
+    for (var i = 0; i < ids.length; i++) {
+        var el = document.getElementById(ids[i]);
+        if (el) el.innerHTML = '';
+    }
+}
+
+function formatResumeApiStructuredBlock(data, externalNameMap) {
     var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
     if (!item || typeof item !== 'object') return null;
     var msg = item.assistant_message;
@@ -630,19 +732,21 @@ function formatResumeApiStructuredBlock(data) {
     if ((!candidates || candidates.length === 0) && item.top_candidates) {
         candidates = item.top_candidates;
     }
-    // Enrich names from id_to_name
-    if (candidates && candidates.length > 0 && item.id_to_name) {
-        var nameMap = item.id_to_name;
+    // Enrich names from id_to_name + external name map (resume_pii)
+    var mergedNames = {};
+    if (item.id_to_name) { for (var k in item.id_to_name) { if (item.id_to_name.hasOwnProperty(k)) mergedNames[k] = item.id_to_name[k]; } }
+    if (externalNameMap) { for (var k2 in externalNameMap) { if (externalNameMap.hasOwnProperty(k2) && !mergedNames[k2]) mergedNames[k2] = externalNameMap[k2]; } }
+    if (candidates && candidates.length > 0) {
         for (var j = 0; j < candidates.length; j++) {
-            if (candidates[j].resume_id && nameMap[candidates[j].resume_id]) {
-                candidates[j].candidate_name = nameMap[candidates[j].resume_id];
+            if (candidates[j].resume_id && mergedNames[candidates[j].resume_id]) {
+                candidates[j].candidate_name = mergedNames[candidates[j].resume_id];
             }
         }
     }
 
     if (!msg && !question && (!candidates || !candidates.length)) return null;
     var html = '';
-    if (msg) { msg = replaceIdsWithNames(msg, data); html += '<div class="chat-structured__message">' + formatChatMessageMarkdown(fixSpacing(msg)) + '</div>'; }
+    if (msg) { msg = replaceIdsWithNames(msg, data, externalNameMap); html += '<div class="chat-structured__message">' + formatChatMessageMarkdown(fixSpacing(msg)) + '</div>'; }
     if (question) html += '<div class="chat-structured__question"><strong>Clarifying:</strong> ' + formatChatMessageMarkdown(fixSpacing(question)) + '</div>';
     if (candidates && candidates.length > 0) {
         html += '<div class="chat-structured__candidates"><strong>Top candidates</strong><ul>';
@@ -651,7 +755,7 @@ function formatResumeApiStructuredBlock(data) {
             var name = (c.candidate_name || c.display || 'Unknown').toString();
             var score = c.score != null ? c.score + '%' : '';
             var reason = (c.reason || '').toString();
-            reason = reason ? formatChatMessageMarkdown(fixSpacing(replaceIdsWithNames(reason, data))) : '';
+            reason = reason ? formatChatMessageMarkdown(fixSpacing(replaceIdsWithNames(reason, data, externalNameMap))) : '';
             html += '<li><span class="chat-structured__name">' + escapeHtml(name) + '</span>' +
                 (score ? ' <span class="chat-structured__score">' + escapeHtml(score) + '</span>' : '') +
                 (reason ? ' — ' + reason : '') + '</li>';
@@ -673,10 +777,31 @@ function escapeHtml(s) {
 }
 
 // Replace resume UUIDs, "Candidate xxxx", and "Resume xxxx" placeholders with real names
-function replaceIdsWithNames(text, data) {
-    if (!text || !data) return text;
-    var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
-    var nameMap = item && item.id_to_name ? item.id_to_name : {};
+var _cachedNameMap = null;
+var _nameMapPromise = null;
+
+function fetchNameMap() {
+    if (_cachedNameMap) return Promise.resolve(_cachedNameMap);
+    if (_nameMapPromise) return _nameMapPromise;
+    _nameMapPromise = fetch('/api/names', { headers: getAuthHeader() })
+        .then(function (res) { return res.ok ? res.json() : {}; })
+        .then(function (map) { _cachedNameMap = map || {}; return _cachedNameMap; })
+        .catch(function () { _cachedNameMap = {}; return _cachedNameMap; });
+    return _nameMapPromise;
+}
+
+function replaceIdsWithNames(text, data, externalNameMap) {
+    if (!text) return text;
+    var item = data ? (Array.isArray(data) && data.length > 0 ? data[0] : data) : null;
+    var nameMap = {};
+    // Merge id_to_name from response
+    if (item && item.id_to_name) {
+        for (var k in item.id_to_name) { if (item.id_to_name.hasOwnProperty(k)) nameMap[k] = item.id_to_name[k]; }
+    }
+    // Merge external name map (from resume_pii)
+    if (externalNameMap) {
+        for (var k2 in externalNameMap) { if (externalNameMap.hasOwnProperty(k2) && !nameMap[k2]) nameMap[k2] = externalNameMap[k2]; }
+    }
     for (var id in nameMap) {
         if (!nameMap.hasOwnProperty(id) || !nameMap[id]) continue;
         var name = nameMap[id];
@@ -685,9 +810,9 @@ function replaceIdsWithNames(text, data) {
         var short = id.substring(0, 8);
         // Replace "Candidate xxxx" (first 8 chars of UUID)
         text = text.split('Candidate ' + short).join(name);
-        // Replace "Resume xxxx" (no spaces) with name
+        // Replace "Resume xxxx"
         text = text.split('Resume ' + short).join(name);
-        // Replace "Resume x x x x ..." (8-char hex with optional spaces) with name
+        // Replace "Resume x x x x ..." (8-char hex with optional spaces)
         var regex = new RegExp('Resume\\s+' + short.split('').join('\\s*') + '(?![0-9a-fA-F])', 'g');
         text = text.replace(regex, name);
     }
@@ -709,12 +834,21 @@ function fixSpacing(text) {
 function formatChatMessageMarkdown(text) {
     if (!text) return '';
     var s = escapeHtml(text);
+    // Remove markdown horizontal rules (---, ***, ___)
+    s = s.replace(/^\s*[-*_]{3,}\s*$/gm, '');
     s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
     s = s.replace(/__(.+?)__/g, '<strong>$1</strong>');
     s = s.replace(/_([^_]+)_/g, '<em>$1</em>');
+    // Markdown headers (### Heading, ## Heading, # Heading)
+    s = s.replace(/^#{3,}\s+(.+)$/gm, '<strong>$1</strong>');
+    s = s.replace(/^#{2}\s+(.+)$/gm, '<strong>$1</strong>');
+    s = s.replace(/^#{1}\s+(.+)$/gm, '<strong>$1</strong>');
     s = s.replace(/\n\n+/g, '</p><p>');
     s = s.replace(/\n/g, '<br>');
+    // Clean up empty paragraphs from removed rules
+    s = s.replace(/<p>\s*<\/p>/g, '');
+    s = s.replace(/(<br>\s*){3,}/g, '<br><br>');
     return '<p>' + s + '</p>';
 }
 
@@ -735,15 +869,27 @@ function setupManagerFlow() {
 
     var selectedJobId = null;
     var selectedJobTitle = null;
+    var selectedJobFull = null; // { id, title, department, location, description } for edit/delete
 
     function openJobPanel(job) {
         var j = job || {};
         selectedJobId = j.id || j.Id;
         selectedJobTitle = j.title || j.Title || '';
+        selectedJobFull = {
+            id: selectedJobId,
+            title: j.title || j.Title || '',
+            department: j.department || j.Department || '',
+            location: j.location || j.Location || '',
+            description: j.description || j.Description || ''
+        };
         jobDetailEl.innerHTML =
-            '<div class="job-detail-title">' + escapeHtml(j.title || j.Title || '') + '</div>' +
-            '<div class="job-detail-meta">' + escapeHtml(j.department || j.Department || '') + ' · ' + escapeHtml(j.location || j.Location || '') + '</div>' +
-            '<div class="job-detail-desc">' + escapeHtml(j.description || j.Description || '') + '</div>';
+            '<div class="job-detail-title">' + escapeHtml(selectedJobFull.title) + '</div>' +
+            '<div class="job-detail-meta">' + escapeHtml(selectedJobFull.department) + ' · ' + escapeHtml(selectedJobFull.location) + '</div>' +
+            '<div class="job-detail-desc">' + escapeHtml(selectedJobFull.description) + '</div>';
+        var actionsEl = document.getElementById('manager-job-actions');
+        if (actionsEl) {
+            actionsEl.style.display = 'block';
+        }
         jobPanel.classList.remove('manager-panel--closed');
         jobPanel.classList.add('manager-panel--open');
         recommendationsWrap.style.display = 'none';
@@ -754,9 +900,103 @@ function setupManagerFlow() {
         jobPanel.classList.remove('manager-panel--open');
         selectedJobId = null;
         selectedJobTitle = null;
+        selectedJobFull = null;
+        var actionsEl = document.getElementById('manager-job-actions');
+        if (actionsEl) actionsEl.style.display = 'none';
     }
 
     if (panelClose) panelClose.addEventListener('click', closeJobPanel);
+
+    // ----- Job add/edit modal -----
+    var jobModal = document.getElementById('manager-job-modal');
+    var jobModalTitle = document.getElementById('manager-job-modal-title');
+    var jobForm = document.getElementById('manager-job-form');
+    var jobFormTitle = document.getElementById('job-form-title');
+    var jobFormDepartment = document.getElementById('job-form-department');
+    var jobFormLocation = document.getElementById('job-form-location');
+    var jobFormDescription = document.getElementById('job-form-description');
+    var editingJobId = null;
+
+    function openJobModal(isEdit) {
+        editingJobId = isEdit ? (selectedJobFull && selectedJobFull.id) : null;
+        if (jobModalTitle) jobModalTitle.textContent = isEdit ? 'Edit job' : 'Add job';
+        if (jobFormTitle) jobFormTitle.value = isEdit ? (selectedJobFull && selectedJobFull.title) || '' : '';
+        if (jobFormDepartment) jobFormDepartment.value = isEdit ? (selectedJobFull && selectedJobFull.department) || '' : '';
+        if (jobFormLocation) jobFormLocation.value = isEdit ? (selectedJobFull && selectedJobFull.location) || '' : '';
+        if (jobFormDescription) jobFormDescription.value = isEdit ? (selectedJobFull && selectedJobFull.description) || '' : '';
+        if (jobModal) {
+            jobModal.classList.remove('job-form-modal--closed');
+            jobModal.setAttribute('aria-hidden', 'false');
+        }
+    }
+    function closeJobModal() {
+        editingJobId = null;
+        if (jobModal) {
+            jobModal.classList.add('job-form-modal--closed');
+            jobModal.setAttribute('aria-hidden', 'true');
+        }
+    }
+    if (document.getElementById('btn-add-job')) {
+        document.getElementById('btn-add-job').addEventListener('click', function () { openJobModal(false); });
+    }
+    if (document.getElementById('btn-edit-job')) {
+        document.getElementById('btn-edit-job').addEventListener('click', function () { openJobModal(true); });
+    }
+    if (document.getElementById('btn-cancel-job-form')) {
+        document.getElementById('btn-cancel-job-form').addEventListener('click', closeJobModal);
+    }
+    if (jobModal && jobModal.querySelector('.job-form-modal-backdrop')) {
+        jobModal.querySelector('.job-form-modal-backdrop').addEventListener('click', closeJobModal);
+    }
+    if (jobForm) {
+        jobForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var title = jobFormTitle && jobFormTitle.value.trim();
+            if (!title) return;
+            var payload = {
+                title: title,
+                department: (jobFormDepartment && jobFormDepartment.value.trim()) || '',
+                location: (jobFormLocation && jobFormLocation.value.trim()) || '',
+                description: (jobFormDescription && jobFormDescription.value.trim()) || ''
+            };
+            var url = editingJobId ? ('/api/jobs/' + encodeURIComponent(editingJobId)) : '/api/jobs';
+            var method = editingJobId ? 'PUT' : 'POST';
+            var headers = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
+            fetch(url, { method: method, headers: headers, body: JSON.stringify(payload) })
+                .then(function (res) {
+                    if (!res.ok) return res.json().then(function (body) { throw new Error(body.message || 'Request failed'); });
+                    return res.status === 204 ? null : res.json();
+                })
+                .then(function () {
+                    closeJobModal();
+                    loadManagerJobs();
+                    if (editingJobId) {
+                        closeJobPanel();
+                    }
+                })
+                .catch(function (err) {
+                    alert(err.message || 'Failed to save job.');
+                });
+        });
+    }
+    if (document.getElementById('btn-delete-job')) {
+        document.getElementById('btn-delete-job').addEventListener('click', function () {
+            if (!selectedJobId) return;
+            if (!confirm('Delete this job posting? This cannot be undone.')) return;
+            var headers = getAuthHeader();
+            fetch('/api/jobs/' + encodeURIComponent(selectedJobId), { method: 'DELETE', headers: headers })
+                .then(function (res) {
+                    if (!res.ok) return res.json().then(function (body) { throw new Error(body.message || 'Delete failed'); });
+                })
+                .then(function () {
+                    closeJobPanel();
+                    loadManagerJobs();
+                })
+                .catch(function (err) {
+                    alert(err.message || 'Failed to delete job.');
+                });
+        });
+    }
 
     function loadManagerJobs() {
         if (!jobsListEl) return;
@@ -865,35 +1105,63 @@ function setupManagerFlow() {
                 var gaps = (c.gaps || []).map(fixSpacing);
                 var reason = fixSpacing(c.reason || '');
 
-                var html = '<h3 style="margin:0 0 0.25rem;color:var(--ey-yellow)">' + escapeHtml(name) + '</h3>';
-                if (pct != null) html += '<p style="margin:0 0 0.75rem;font-size:0.9rem;color:#9ca3af">Match score: <strong style="color:var(--ey-yellow)">' + pct + '%</strong></p>';
-                if (reason) html += '<p style="margin:0 0 0.75rem;color:#e5e7eb;line-height:1.5">' + escapeHtml(reason) + '</p>';
+                var html = '<h3 style="margin:0 0 0.25rem;color:var(--ey-accent-text)">' + escapeHtml(name) + '</h3>';
+                if (pct != null) html += '<p style="margin:0 0 0.75rem;font-size:0.9rem;color:var(--ey-text-muted)">Match score: <strong style="color:var(--ey-accent-text)">' + pct + '%</strong></p>';
+                if (reason) html += '<p style="margin:0 0 0.75rem;color:var(--ey-text);line-height:1.5">' + escapeHtml(reason) + '</p>';
                 if (strengths.length > 0) {
-                    html += '<p style="margin:0.75rem 0 0.25rem;font-weight:600;color:var(--ey-yellow)">Strengths</p><ul style="margin:0;padding-left:1.25rem;color:#e5e7eb">';
+                    html += '<p style="margin:0.75rem 0 0.25rem;font-weight:600;color:var(--ey-accent-text)">Strengths</p><ul style="margin:0;padding-left:1.25rem;color:var(--ey-text)">';
                     strengths.forEach(function (s) { html += '<li style="margin-bottom:0.25rem;line-height:1.4">' + escapeHtml(s) + '</li>'; });
                     html += '</ul>';
                 }
                 if (gaps.length > 0) {
-                    html += '<p style="margin:0.75rem 0 0.25rem;font-weight:600;color:#f87171">Gaps</p><ul style="margin:0;padding-left:1.25rem;color:#e5e7eb">';
+                    html += '<p style="margin:0.75rem 0 0.25rem;font-weight:600;color:#f87171">Gaps</p><ul style="margin:0;padding-left:1.25rem;color:var(--ey-text)">';
                     gaps.forEach(function (g) { html += '<li style="margin-bottom:0.25rem;line-height:1.4">' + escapeHtml(g) + '</li>'; });
                     html += '</ul>';
                 }
 
-                // Upskilling plan — generated from gaps, no AI call needed
+                // Upskilling plan — phased layout (header, 3 phase cards, footer)
                 var steps = generateUpskillSteps(gaps);
+                var seen = {};
+                steps = steps.filter(function (s) {
+                    var key = (s.step || '').trim();
+                    if (seen[key]) return false;
+                    seen[key] = true;
+                    return true;
+                });
+                var jobTitle = (selectedJobTitle || selectedJobId || 'Target role').toString();
                 html += '<div style="margin-top:1rem;border-top:1px solid var(--ey-border);padding-top:0.75rem">';
-                html += '<p style="margin:0 0 0.5rem;font-weight:600;color:var(--ey-yellow)">Upskilling Plan</p>';
+                html += '<p style="margin:0 0 0.5rem;font-weight:600;color:var(--ey-accent-text)">Upskilling Plan</p>';
                 if (steps.length > 0) {
-                    html += '<ol style="margin:0;padding-left:1.25rem;color:#e5e7eb">';
-                    steps.forEach(function (s) {
-                        html += '<li style="margin-bottom:0.5rem;line-height:1.4">';
-                        html += '<strong style="color:var(--ey-yellow)">' + escapeHtml(s.step) + '</strong>';
-                        html += '<br><span style="font-size:0.82rem;color:#d1d5db">' + escapeHtml(s.desc) + '</span>';
-                        html += '</li>';
-                    });
-                    html += '</ol>';
+                    html += '<p class="upskill-plan-header">' + escapeHtml(name) + ' &mdash; ' + escapeHtml(jobTitle) + (pct != null ? ' &mdash; Gap Score: ' + pct + '%' : '') + '</p>';
+                    var phaseLabels = ['Foundations', 'Skills & Practice', 'Application'];
+                    var n = steps.length;
+                    var totalWeeks = 0;
+                    var totalCost = 0;
+                    html += '<div class="upskill-phases">';
+                    for (var ph = 0; ph < 3; ph++) {
+                        var start = Math.floor((ph * n) / 3);
+                        var end = ph < 2 ? Math.floor(((ph + 1) * n) / 3) : n;
+                        var phaseSteps = steps.slice(start, end);
+                        var weeks = Math.max(2, phaseSteps.length * 2);
+                        var cost = phaseSteps.length * 120;
+                        totalWeeks += weeks;
+                        totalCost += cost;
+                        html += '<div class="upskill-phase">';
+                        html += '<div class="upskill-phase__header">Phase ' + (ph + 1) + '</div>';
+                        html += '<div class="upskill-phase__title">' + escapeHtml(phaseLabels[ph]) + '</div>';
+                        html += '<div class="upskill-phase__meta"><span class="upskill-phase__meta-num">' + weeks + '</span> weeks | ~$<span class="upskill-phase__meta-num">' + cost + '</span></div>';
+                        html += '<ul class="upskill-phase__list">';
+                        phaseSteps.forEach(function (s) {
+                            html += '<li class="upskill-step"><span class="upskill-step__name">' + escapeHtml(s.step) + '</span>';
+                            if (s.desc) html += '<ul class="upskill-step__details"><li>' + escapeHtml(s.desc) + '</li></ul>';
+                            html += '</li>';
+                        });
+                        html += '</ul></div>';
+                    }
+                    html += '</div>';
+                    html += '<div class="upskill-footer">Total: ' + totalWeeks + ' weeks | ~$' + totalCost + ' | Sequenced, practical, and costed</div>';
                 } else {
-                    html += '<p style="color:#9ca3af;font-size:0.85rem">No gaps identified — candidate is well-suited for this role.</p>';
+                    html += '<p style="color:var(--ey-text-muted);font-size:0.85rem">No gaps identified — candidate is well-suited for this role.</p>';
                 }
                 html += '</div>';
 
@@ -912,19 +1180,16 @@ function setupManagerFlow() {
             })
                 .then(function (res) { return res.ok ? res.json() : Promise.reject(new Error('Failed to load recommendations')); })
                 .then(function (data) {
+                    return fetchNameMap().then(function (extNames) {
                     var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
                     var candidates = null;
-                    // Always try parsing from the response text first — it preserves proper spacing
                     if (item && item.response) {
                         var raw = item.response;
-                        // Strip markdown code fences
                         raw = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
-                        // Try parsing the whole response as JSON first
                         try {
                             var full = (typeof raw === 'string') ? JSON.parse(raw) : raw;
                             if (full && full.top_candidates && full.top_candidates.length > 0) candidates = full.top_candidates;
                         } catch (e) { /* not pure JSON */ }
-                        // Try extracting JSON object containing top_candidates
                         if (!candidates || candidates.length === 0) {
                             try {
                                 var idx = raw.indexOf('"top_candidates"');
@@ -946,16 +1211,17 @@ function setupManagerFlow() {
                             } catch (e) { /* give up */ }
                         }
                     }
-                    // Fallback to top-level top_candidates if response parsing didn't work
                     if ((!candidates || candidates.length === 0) && item && item.top_candidates) {
                         candidates = item.top_candidates;
                     }
-                    // Enrich with real names from id_to_name (AI uses placeholder names like "Candidate 20a9fda3")
-                    if (candidates && candidates.length > 0 && item && item.id_to_name) {
-                        var nameMap = item.id_to_name;
+                    // Enrich with names from id_to_name + resume_pii
+                    var mergedNames = {};
+                    if (item && item.id_to_name) { for (var k in item.id_to_name) { if (item.id_to_name.hasOwnProperty(k)) mergedNames[k] = item.id_to_name[k]; } }
+                    if (extNames) { for (var k2 in extNames) { if (extNames.hasOwnProperty(k2) && !mergedNames[k2]) mergedNames[k2] = extNames[k2]; } }
+                    if (candidates && candidates.length > 0) {
                         candidates = candidates.map(function (c) {
-                            if (c.resume_id && nameMap[c.resume_id]) {
-                                c.candidate_name = nameMap[c.resume_id];
+                            if (c.resume_id && mergedNames[c.resume_id]) {
+                                c.candidate_name = mergedNames[c.resume_id];
                             }
                             return c;
                         });
@@ -978,6 +1244,7 @@ function setupManagerFlow() {
                         return;
                     }
                     recommendationsListEl.innerHTML = '<p class="placeholder-text">No recommendations returned.</p>';
+                    });
                 })
                 .catch(function () {
                     recommendationsListEl.innerHTML = '<p class="placeholder-text">Could not load recommendations.</p>';

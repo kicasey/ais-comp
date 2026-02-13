@@ -14,9 +14,15 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Add Entity Framework Core (SQLite in Development, SQL Server otherwise)
+// Add Entity Framework Core (SQLite, MySQL, or SQL Server per config)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? "";
-if (connectionString.TrimStart().StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase) || connectionString.EndsWith(".db", StringComparison.OrdinalIgnoreCase))
+var provider = builder.Configuration.GetValue<string>("DatabaseProvider") ?? "";
+if (provider.Equals("MySql", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+}
+else if (connectionString.TrimStart().StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase) || connectionString.EndsWith(".db", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseSqlite(connectionString));

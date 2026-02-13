@@ -15,6 +15,60 @@
     --font-ey: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+/* Light theme overrides */
+:root {
+    --ey-accent-text: var(--ey-yellow);
+}
+[data-theme="light"] {
+    --ey-bg: #f5f5f5;
+    --ey-bg-card: #ffffff;
+    --ey-bg-input: #e8e8e8;
+    --ey-border: #d4d4d4;
+    --ey-text: #1a1a1a;
+    --ey-text-muted: #6b7280;
+    --ey-white: #1a1a1a;
+    --ey-yellow-glow: rgba(255, 230, 0, 0.2);
+    --ey-accent-text: #1a1a1a;
+}
+
+/* ----- Theme toggle ----- */
+.theme-toggle {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+.theme-toggle__track {
+    position: relative;
+    width: 48px;
+    height: 26px;
+    background: #333;
+    border-radius: 13px;
+    transition: background 0.3s ease;
+    display: flex;
+    align-items: center;
+}
+[data-theme="light"] .theme-toggle__track {
+    background: #d4d4d4;
+}
+.theme-toggle__thumb {
+    position: absolute;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #1a1a1a;
+    transition: transform 0.3s ease, background 0.3s ease;
+    box-shadow: inset -6px -2px 0 0 #f0f0f0;
+}
+[data-theme="light"] .theme-toggle__thumb {
+    transform: translateX(22px);
+    background: #1a1a1a;
+    box-shadow: none;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -29,12 +83,18 @@ body {
     min-height: 100vh;
 }
 
-/* ----- EY logo: top right on landing only ----- */
+/* ----- EY logo + theme toggle: top right on landing only ----- */
 .ey-logo-top {
     position: fixed;
     top: 1rem;
     right: 1rem;
     z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.ey-logo-top .theme-toggle {
+    display: flex;
 }
 body.page--app .ey-logo-top,
 body.page--login .ey-logo-top {
@@ -135,7 +195,7 @@ body.page--landing .ey-logo-bottom {
 .landing-card__title {
     font-size: 1.25rem;
     font-weight: 700;
-    color: var(--ey-yellow);
+    color: var(--ey-accent-text);
     margin-bottom: 0.5rem;
 }
 .landing-card__desc {
@@ -146,7 +206,7 @@ body.page--landing .ey-logo-bottom {
 
 .back-to-landing {
     margin-top: 2rem;
-    color: var(--ey-yellow);
+    color: var(--ey-accent-text);
     font-size: 0.95rem;
     text-decoration: none;
 }
@@ -168,8 +228,8 @@ body.page--landing .ey-logo-bottom {
 .btn-back {
     padding: 0.4rem 0.75rem;
     background: transparent;
-    color: var(--ey-yellow);
-    border: 1px solid var(--ey-yellow);
+    color: var(--ey-accent-text);
+    border: 1px solid var(--ey-accent-text);
     border-radius: 6px;
     font-family: var(--font-ey);
     font-size: 0.9rem;
@@ -246,7 +306,7 @@ body.page--landing .ey-logo-bottom {
     position: fixed;
     top: 1.25rem;
     left: 1.25rem;
-    color: var(--ey-yellow);
+    color: var(--ey-accent-text);
     font-size: 0.9rem;
     font-weight: 500;
     text-decoration: none;
@@ -407,7 +467,7 @@ body.page--landing .ey-logo-bottom {
 .section-title {
     font-size: 1.05rem;
     font-weight: 600;
-    color: var(--ey-yellow);
+    color: var(--ey-accent-text);
     margin-bottom: 0.75rem;
 }
 
@@ -425,15 +485,20 @@ body.page--landing .ey-logo-bottom {
     margin-bottom: 0;
 }
 .form-group--file {
-    position: relative;
     width: fit-content;
     min-width: 160px;
+}
+.file-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
 }
 .file-input-native {
     position: absolute;
     left: 0;
     top: 0;
-    width: 100%;
+    width: calc(100% - 90px);
     height: 40px;
     opacity: 0;
     cursor: pointer;
@@ -501,6 +566,10 @@ body.page--landing .ey-logo-bottom {
     border-radius: 6px;
     cursor: pointer;
     transition: background 0.2s ease, transform 0.15s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 3;
 }
 .submit-btn--compact:hover:not(:disabled) {
     background: var(--ey-yellow-dark);
@@ -525,6 +594,32 @@ body.page--landing .ey-logo-bottom {
     background: rgba(200, 0, 0, 0.15);
     color: #f88;
     border: 1px solid rgba(200, 0, 0, 0.3);
+}
+.message-info {
+    background: rgba(255, 230, 0, 0.1);
+    color: var(--ey-accent-text);
+    border: 1px solid rgba(255, 230, 0, 0.3);
+}
+
+/* ----- Last upload info box ----- */
+.last-upload-box {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 1rem;
+    background: var(--ey-bg-input);
+    border: 1px solid var(--ey-border);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+}
+.last-upload-box__label {
+    font-weight: 600;
+    color: var(--ey-accent-text);
+    white-space: nowrap;
+}
+.last-upload-box__detail {
+    color: var(--ey-text-muted);
 }
 
 /* ----- Match lists ----- */
@@ -585,7 +680,7 @@ body.page--landing .ey-logo-bottom {
 }
 .chat-message__role {
     font-weight: 600;
-    color: var(--ey-yellow);
+    color: var(--ey-accent-text);
     margin-bottom: 0.25rem;
     font-size: 0.75rem;
     text-transform: uppercase;
@@ -603,7 +698,7 @@ body.page--landing .ey-logo-bottom {
 }
 .chat-message__text strong {
     font-weight: 600;
-    color: var(--ey-yellow);
+    color: var(--ey-accent-text);
 }
 .chat-message__text em {
     font-style: italic;
@@ -631,7 +726,7 @@ body.page--landing .ey-logo-bottom {
 .chat-structured__message strong,
 .chat-structured__question strong {
     font-weight: 600;
-    color: var(--ey-yellow);
+    color: var(--ey-accent-text);
 }
 .chat-structured__question {
     color: var(--ey-text-muted);
@@ -642,7 +737,7 @@ body.page--landing .ey-logo-bottom {
     display: inline;
 }
 .chat-structured__candidates li strong {
-    color: var(--ey-yellow);
+    color: var(--ey-accent-text);
 }
 .chat-structured__candidates {
     margin-top: 0.75rem;
@@ -666,7 +761,7 @@ body.page--landing .ey-logo-bottom {
 }
 .chat-structured__name {
     font-weight: 600;
-    color: var(--ey-yellow);
+    color: var(--ey-accent-text);
 }
 .chat-structured__score {
     color: var(--ey-yellow-dark);
@@ -800,12 +895,28 @@ body.page--landing .ey-logo-bottom {
 }
 .job-card__title {
     font-weight: 600;
-    color: var(--ey-yellow);
+    color: var(--ey-accent-text);
     margin-bottom: 0.25rem;
 }
 .job-card__meta {
     font-size: 0.85rem;
     color: var(--ey-text-muted);
+}
+.btn-add-job {
+    margin-bottom: 0.75rem;
+    padding: 0.5rem 1rem;
+    background: var(--ey-bg-input);
+    border: 1px solid var(--ey-border);
+    border-radius: 6px;
+    color: var(--ey-accent-text);
+    font-family: var(--font-ey);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+.btn-add-job:hover {
+    border-color: var(--ey-yellow);
+    background: rgba(255, 230, 0, 0.1);
 }
 
 .manager-panel {
@@ -848,7 +959,7 @@ body.page--landing .ey-logo-bottom {
 }
 .manager-job-detail .job-detail-title {
     font-weight: 700;
-    color: var(--ey-yellow);
+    color: var(--ey-accent-text);
     margin-bottom: 0.5rem;
 }
 .manager-job-detail .job-detail-meta {
@@ -860,6 +971,33 @@ body.page--landing .ey-logo-bottom {
     line-height: 1.5;
     color: var(--ey-text);
 }
+.manager-job-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+.btn-edit-job,
+.btn-delete-job {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-family: var(--font-ey);
+    font-size: 0.85rem;
+    cursor: pointer;
+    border: 1px solid var(--ey-border);
+    background: var(--ey-bg-input);
+    color: var(--ey-text);
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+.btn-edit-job:hover {
+    border-color: var(--ey-yellow);
+    color: var(--ey-yellow);
+}
+.btn-delete-job:hover {
+    border-color: #f87171;
+    color: #f87171;
+}
+
 .btn-recommend-employees {
     width: 100%;
     padding: 0.75rem 1rem;
@@ -876,6 +1014,101 @@ body.page--landing .ey-logo-bottom {
 .btn-recommend-employees:hover {
     background: var(--ey-yellow-dark);
     transform: translateY(-1px);
+}
+
+/* Job add/edit modal */
+.job-form-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+.job-form-modal--closed {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+.job-form-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+}
+.job-form-modal-inner {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    background: var(--ey-bg-card);
+    border: 1px solid var(--ey-border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+.job-form-modal-title {
+    margin: 0 0 1rem 0;
+    font-size: 1.1rem;
+    color: var(--ey-accent-text);
+}
+.job-form .form-group {
+    margin-bottom: 1rem;
+}
+.job-form .form-group label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.9rem;
+    color: var(--ey-text-muted);
+}
+.job-form .form-group input,
+.job-form .form-group textarea {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: var(--ey-bg-input);
+    border: 1px solid var(--ey-border);
+    border-radius: 6px;
+    color: var(--ey-text);
+    font-family: var(--font-ey);
+    font-size: 0.95rem;
+    box-sizing: border-box;
+}
+.job-form .form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+.job-form-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+}
+.btn-cancel-job-form {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: 1px solid var(--ey-border);
+    border-radius: 6px;
+    color: var(--ey-text-muted);
+    font-family: var(--font-ey);
+    cursor: pointer;
+}
+.btn-cancel-job-form:hover {
+    color: var(--ey-text);
+    border-color: var(--ey-text-muted);
+}
+.btn-save-job {
+    padding: 0.5rem 1.25rem;
+    background: var(--ey-yellow);
+    color: var(--ey-black);
+    border: none;
+    border-radius: 6px;
+    font-family: var(--font-ey);
+    font-weight: 600;
+    cursor: pointer;
+}
+.btn-save-job:hover {
+    background: var(--ey-yellow-dark);
 }
 
 .recommendations-wrap {
@@ -970,7 +1203,7 @@ body.page--landing .ey-logo-bottom {
 .employee-popout-title {
     font-size: 1.1rem;
     font-weight: 600;
-    color: var(--ey-yellow);
+    color: var(--ey-accent-text);
     margin-bottom: 0.75rem;
 }
 .employee-popout-content {
@@ -978,7 +1211,12 @@ body.page--landing .ey-logo-bottom {
     line-height: 1.6;
     white-space: pre-wrap;
     color: var(--ey-text);
-    white-space: pre-wrap;
+}
+.employee-popout-content .upskill-plan-header,
+.employee-popout-content .upskill-phases,
+.employee-popout-content .upskill-phase,
+.employee-popout-content .upskill-footer {
+    white-space: normal;
 }
 
 .chat-section--manager {
@@ -989,6 +1227,117 @@ body.page--landing .ey-logo-bottom {
     max-height: 520px;
 }
 
+/* Upskilling plan — three horizontal phase cards + yellow footer (second image) */
+.upskill-plan-header {
+    font-size: 0.85rem;
+    color: var(--ey-text-muted);
+    margin: 0 0 0.75rem 0;
+}
+.upskill-phases,
+.employee-popout-content .upskill-phases {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    margin-bottom: 0;
+}
+.upskill-phase,
+.employee-popout-content .upskill-phase {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+    background: var(--ey-bg-card);
+    border: 1px solid var(--ey-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.upskill-phase__header {
+    padding: 0.4rem 0.5rem;
+    font-weight: 700;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+.upskill-phase:nth-child(1) .upskill-phase__header {
+    background: var(--ey-yellow);
+    color: var(--ey-black);
+}
+.upskill-phase:nth-child(2) .upskill-phase__header {
+    background: #d4c000;
+    color: var(--ey-black);
+}
+.upskill-phase:nth-child(3) .upskill-phase__header {
+    background: #b8a800;
+    color: var(--ey-white);
+}
+.upskill-phase__title {
+    padding: 0.5rem 0.75rem 0.2rem;
+    font-weight: 700;
+    color: var(--ey-white);
+    font-size: 0.9rem;
+}
+.upskill-phase__meta {
+    padding: 0 0.75rem 0.5rem;
+    font-size: 0.75rem;
+    color: var(--ey-text-muted);
+}
+.upskill-phase__meta-num {
+    color: var(--ey-accent-text);
+    font-weight: 600;
+}
+.upskill-phase__list {
+    margin: 0 0 0.75rem 0;
+    padding-left: 1.25rem;
+    color: var(--ey-text-muted);
+    font-size: 0.8rem;
+    line-height: 1.45;
+    list-style: none;
+}
+.upskill-phase__list li {
+    margin-bottom: 0.5rem;
+    position: relative;
+}
+.upskill-phase__list > li::before {
+    content: '';
+    position: absolute;
+    left: -1rem;
+    top: 0.45em;
+    width: 5px;
+    height: 5px;
+    background: var(--ey-yellow);
+    border-radius: 0;
+}
+.upskill-step__name {
+    font-weight: 600;
+    color: var(--ey-text);
+}
+.upskill-step__details {
+    margin: 0.25rem 0 0 0.75rem;
+    padding-left: 1rem;
+    list-style: disc;
+    font-size: 0.78rem;
+    color: var(--ey-text-muted);
+    font-weight: normal;
+}
+.upskill-step__details li {
+    margin-bottom: 0.15rem;
+}
+.upskill-step__details li::before {
+    display: none;
+}
+.upskill-footer {
+    display: block;
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--ey-yellow);
+    color: var(--ey-black);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-align: center;
+    border: 1px solid var(--ey-border);
+    border-radius: 0 0 8px 8px;
+    box-sizing: border-box;
+}
 
 .sr-only {
     position: absolute;
