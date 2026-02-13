@@ -8,7 +8,7 @@ public static class DataSeeder
 {
     private const string SampleLoginsPath = "TestData/sample-logins.json";
 
-    public static async Task SeedAsync(AppDbContext db, ILogger logger)
+    public static async Task SeedAsync(AppDbContext db, ILogger logger, bool syncPasswordsInDev = false)
     {
         try
         {
@@ -20,11 +20,6 @@ public static class DataSeeder
             return;
         }
 
-        if (await db.Users.AnyAsync())
-        {
-            return;
-        }
-
         // Prefer output directory (when TestData is copied to output), then project directory
         var path = Path.Combine(AppContext.BaseDirectory, SampleLoginsPath);
         if (!System.IO.File.Exists(path))
@@ -33,7 +28,7 @@ public static class DataSeeder
         }
         if (!System.IO.File.Exists(path))
         {
-            logger.LogInformation("Sample logins file not found at {Path}. Skipping seed.", path);
+            logger.LogWarning("Sample logins file not found (tried BaseDirectory and CurrentDirectory). Skipping seed.");
             return;
         }
 
@@ -77,16 +72,28 @@ public static class DataSeeder
             return;
         }
 
+        var added = 0;
+        var synced = 0;
         foreach (var login in logins)
         {
             var email = login.Email.Trim().ToLowerInvariant();
-            if (await db.Users.AnyAsync(u => u.Email.ToLower() == email))
+            var existing = await db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email);
+            if (existing != null)
+            {
+                if (syncPasswordsInDev)
+                {
+                    existing.PasswordHash = BCrypt.Net.BCrypt.HashPassword(login.Password.Trim(), BCrypt.Net.BCrypt.GenerateSalt(10));
+                    existing.DisplayName = string.IsNullOrWhiteSpace(login.DisplayName) ? email : login.DisplayName.Trim();
+                    await db.SaveChangesAsync();
+                    synced++;
+                }
                 continue;
+            }
 
             var user = new User
             {
                 Email = email,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(login.Password, BCrypt.Net.BCrypt.GenerateSalt(10)),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(login.Password.Trim(), BCrypt.Net.BCrypt.GenerateSalt(10)),
                 Role = login.Role == "manager" ? "manager" : "employee",
                 DisplayName = string.IsNullOrWhiteSpace(login.DisplayName) ? email : login.DisplayName.Trim(),
                 CreatedAt = DateTime.UtcNow
@@ -105,9 +112,11 @@ public static class DataSeeder
                 });
                 await db.SaveChangesAsync();
             }
+            added++;
         }
 
-        logger.LogInformation("Seeded {Count} test users from sample-logins.json.", logins.Count);
+        if (added > 0 || synced > 0)
+            logger.LogInformation("Sample logins: added {Added}, password-synced {Synced} ({Total} in file).", added, synced, logins.Count);
     }
 
     private class SampleLogin
