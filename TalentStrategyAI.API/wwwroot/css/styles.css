@@ -15,6 +15,44 @@
     --font-ey: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+/* Light theme (toggle): black text, yellow as accent only */
+body[data-theme="light"] {
+    --ey-bg: #f5f5f5;
+    --ey-bg-card: #ffffff;
+    --ey-bg-input: #eeeeee;
+    --ey-border: #ddd;
+    --ey-text: #1a1a1a;
+    --ey-text-muted: #666666;
+}
+body[data-theme="light"] .landing-title,
+body[data-theme="light"] .logo {
+    color: #000000;
+    font-weight: 700;
+}
+/* Light mode: section and card titles black, yellow as left border accent */
+body[data-theme="light"] .section-title {
+    color: #000000;
+    border-left: 4px solid var(--ey-yellow);
+    padding-left: 0.5rem;
+}
+body[data-theme="light"] .landing-card__title { color: #000000; }
+body[data-theme="light"] .employee-popout-title,
+body[data-theme="light"] .employee-popout-drag { color: #000000; }
+body[data-theme="light"] .profile-resume-value.has-resume { color: #0d0d0d; }
+body[data-theme="light"] .chat-message__role { color: #000000; }
+body[data-theme="light"] .recommendation-card__name { color: #000000; }
+body[data-theme="light"] .job-detail-title { color: #000000; }
+body[data-theme="light"] .job-card__title {
+    color: #000000;
+    border-bottom: 2px solid var(--ey-yellow);
+    padding-bottom: 0.2rem;
+    display: inline-block;
+}
+body[data-theme="light"] .landing-tagline { color: var(--ey-text); }
+body[data-theme="light"] .landing-cta { color: var(--ey-text-muted); }
+body[data-theme="light"] .employee-popout { background: var(--ey-bg-card); border-color: var(--ey-border); }
+body[data-theme="light"] .employee-popout-content { color: var(--ey-text); }
+
 * {
     margin: 0;
     padding: 0;
@@ -29,16 +67,91 @@ body {
     min-height: 100vh;
 }
 
-/* ----- EY logo: top right on landing only ----- */
+/* ----- EY logo + theme toggle: top right on landing ----- */
 .ey-logo-top {
     position: fixed;
     top: 1rem;
     right: 1rem;
     z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 body.page--app .ey-logo-top,
 body.page--login .ey-logo-top {
     display: none;
+}
+/* Pill-shaped theme switch (sun/moon, yellow thumb) */
+.theme-switch {
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.theme-switch-track {
+    display: flex;
+    align-items: center;
+    width: 52px;
+    height: 26px;
+    border-radius: 13px;
+    background: var(--ey-bg-input);
+    border: 1px solid var(--ey-border);
+    position: relative;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+.theme-switch:hover .theme-switch-track {
+    border-color: var(--ey-yellow);
+}
+.theme-switch-thumb {
+    position: absolute;
+    left: 2px;
+    top: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--ey-yellow);
+    color: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.25s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+body[data-theme="dark"] .theme-switch-thumb {
+    transform: translateX(26px);
+}
+body[data-theme="light"] .theme-switch-thumb {
+    transform: translateX(0);
+}
+.theme-switch-icon {
+    width: 12px;
+    height: 12px;
+    position: absolute;
+    stroke: #000;
+}
+.theme-switch-icon--sun { opacity: 0; }
+.theme-switch-icon--moon { opacity: 0; }
+body[data-theme="dark"] .theme-switch-icon--moon { opacity: 1; }
+body[data-theme="light"] .theme-switch-icon--sun { opacity: 1; }
+.theme-toggle--header .theme-switch-track {
+    width: 48px;
+    height: 24px;
+    border-radius: 12px;
+}
+.theme-toggle--header .theme-switch-thumb {
+    width: 18px;
+    height: 18px;
+    left: 2px;
+    top: 2px;
+}
+body[data-theme="dark"] .theme-toggle--header .theme-switch-thumb {
+    transform: translateX(24px);
+}
+body[data-theme="light"] .theme-toggle--header .theme-switch-thumb {
+    transform: translateX(0);
+}
+.theme-toggle--header .theme-switch-icon {
+    width: 10px;
+    height: 10px;
 }
 /* ----- EY logo: bottom right on chatbot (Employee/Manager) only ----- */
 .ey-logo-bottom {
@@ -211,6 +324,9 @@ body.page--landing .ey-logo-bottom {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+}
+.theme-toggle.theme-switch {
+    /* pill switch styles are above */
 }
 .header-user {
     font-size: 0.9rem;
@@ -411,7 +527,21 @@ body.page--landing .ey-logo-bottom {
     margin-bottom: 0.75rem;
 }
 
-/* ----- Resume upload: file input only on the label (fix click-everywhere) ----- */
+/* ----- Employee profile card ----- */
+.profile-section { margin-bottom: 1.5rem; }
+.profile-card {
+    background: var(--ey-bg-input);
+    border: 1px solid var(--ey-border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+}
+.profile-line { margin: 0 0 0.35rem 0; font-size: 0.95rem; color: var(--ey-text); }
+.profile-resume-row { margin-top: 0.5rem; font-size: 0.9rem; }
+.profile-resume-value { color: var(--ey-text-muted); }
+.profile-resume-value.has-resume { color: var(--ey-yellow); }
+
+/* ----- Resume upload ----- */
 .upload-section {
     margin-bottom: 1.5rem;
 }
@@ -710,7 +840,7 @@ body.page--landing .ey-logo-bottom {
     border-radius: 6px;
     font-family: var(--font-ey);
     font-size: 0.85rem;
-    font-weight: 500;
+    font-weight: 400;
     cursor: pointer;
     transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
@@ -838,6 +968,11 @@ body.page--landing .ey-logo-bottom {
     transform: translateY(-1px);
 }
 
+.recommendations-instruction {
+    font-size: 0.9rem;
+    color: var(--ey-text-muted);
+    margin-bottom: 0.75rem;
+}
 .recommendations-wrap {
     margin-top: 1.5rem;
     max-height: 420px;
@@ -890,6 +1025,7 @@ body.page--landing .ey-logo-bottom {
     left: 0;
     right: 0;
     max-height: 50vh;
+    min-height: 120px;
     background: var(--ey-bg-card);
     border-top: 2px solid var(--ey-yellow);
     border-radius: 12px 12px 0 0;
@@ -897,6 +1033,11 @@ body.page--landing .ey-logo-bottom {
     z-index: 200;
     transition: transform 0.3s ease;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.employee-popout--resizing {
+    transition: none;
 }
 .employee-popout--closed {
     transform: translateY(100%);
@@ -906,12 +1047,118 @@ body.page--landing .ey-logo-bottom {
     transform: translateY(0);
     pointer-events: auto;
 }
+.employee-popout--open.employee-popout--collapsed {
+    max-height: 52px;
+    min-height: 52px;
+}
+.employee-popout--open.employee-popout--collapsed .employee-popout-inner,
+.employee-popout--open.employee-popout--collapsed .employee-popout-resize {
+    display: none;
+}
+.employee-popout-resize {
+    flex-shrink: 0;
+    height: 6px;
+    cursor: ns-resize;
+    background: var(--ey-border);
+    border-bottom: 1px solid var(--ey-border);
+}
+.employee-popout-resize:hover {
+    background: var(--ey-yellow);
+}
+.employee-popout-drag {
+    flex-shrink: 0;
+    width: 100%;
+    padding: 0.6rem 1rem;
+    background: var(--ey-bg-input);
+    border: none;
+    border-bottom: 1px solid var(--ey-border);
+    color: var(--ey-yellow);
+    font-size: 1rem;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.2s ease;
+}
+.employee-popout-drag:hover {
+    background: var(--ey-border);
+}
+.employee-popout--collapsed .employee-popout-drag {
+    border-radius: 12px 12px 0 0;
+}
 .employee-popout-inner {
     position: relative;
     padding: 1.25rem 1.5rem 2rem;
-    max-height: 50vh;
     overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
 }
+.employee-popout-single {
+    flex: 1;
+    min-height: 0;
+}
+.employee-popout-compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+.employee-popout-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--ey-border);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    overflow: hidden;
+}
+.employee-popout-panel-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ey-yellow);
+    margin-bottom: 0.5rem;
+    flex-shrink: 0;
+}
+.employee-popout-panel .employee-popout-content {
+    font-size: 0.9rem;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+.employee-popout-actions {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--ey-border);
+}
+.employee-popout-compare-btn,
+.employee-popout-back-single {
+    padding: 0.4rem 0.75rem;
+    background: var(--ey-bg-input);
+    border: 1px solid var(--ey-border);
+    border-radius: 6px;
+    color: var(--ey-text);
+    font-family: var(--font-ey);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+.employee-popout-compare-btn:hover,
+.employee-popout-back-single:hover {
+    border-color: var(--ey-yellow);
+    background: rgba(255, 230, 0, 0.1);
+    color: var(--ey-yellow);
+}
+.employee-popout-compare-hint {
+    font-size: 0.85rem;
+    color: var(--ey-text-muted);
+    margin: 0;
+}
+body[data-theme="light"] .employee-popout-panel-title { color: #000; border-bottom: 1px solid var(--ey-yellow); padding-bottom: 0.25rem; }
 .employee-popout-close {
     position: absolute;
     top: 0.5rem;

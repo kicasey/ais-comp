@@ -7,5 +7,8 @@ public class EmployeeProfile
     public string? Name { get; set; }
     public string? Position { get; set; }
     public string? Department { get; set; }
+    public string? ResumeFileName { get; set; }
+    public string? ResumeFilePath { get; set; }
+    public DateTime? ResumeUploadedAt { get; set; }
 }
 

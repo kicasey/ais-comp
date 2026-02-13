@@ -7,12 +7,17 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeApp();
 });
 
+var THEME_STORAGE_KEY = 'talentStrategyTheme';
+
 function initializeApp() {
+    applyStoredTheme();
     ensureAuthGate();
     setupLanding();
     setupBackButton();
     setupAuth();
     setupResumeUploadForm();
+    loadEmployeeProfileWhenNeeded();
+    setupThemeToggle();
     setupChatPresets('employee');
     setupChatPresets('manager');
     setupChatSendButtons();
@@ -314,7 +319,89 @@ function showAppByRole(role) {
     } else {
         if (emp) emp.classList.remove('interface--hidden');
         if (mgr) mgr.classList.add('interface--hidden');
+        loadEmployeeProfile();
     }
+}
+
+function loadEmployeeProfileWhenNeeded() {
+    var auth = getStoredAuth();
+    if (!auth || (auth.role || '').toLowerCase() !== 'employee') return;
+    var emp = document.getElementById('interface-employee');
+    if (emp && !emp.classList.contains('interface--hidden')) loadEmployeeProfile();
+}
+
+function loadEmployeeProfile() {
+    var nameEl = document.getElementById('profile-name');
+    var emailEl = document.getElementById('profile-email');
+    var valueEl = document.getElementById('profile-resume-value');
+    if (!valueEl) return;
+    var headers = getAuthHeader();
+    if (!headers.Authorization) {
+        if (nameEl) nameEl.textContent = '';
+        if (emailEl) emailEl.textContent = '';
+        valueEl.textContent = 'Sign in to see your profile.';
+        return;
+    }
+    valueEl.textContent = 'Loading…';
+    fetch('/api/resume/profile', { headers: headers })
+        .then(function (res) { return res.json().catch(function () { return null; }); })
+        .then(function (data) {
+            if (!data) { valueEl.textContent = 'Could not load profile.'; return; }
+            if (data.isEmployee) {
+                if (nameEl) nameEl.textContent = (data.displayName || data.name || '').trim() || '—';
+                if (emailEl) emailEl.textContent = (data.email || '').trim() || '—';
+                if (data.hasResume && data.resumeFileName) {
+                    valueEl.textContent = data.resumeFileName + (data.resumeUploadedAt ? ' (uploaded ' + formatResumeDate(data.resumeUploadedAt) + ')' : '');
+                    valueEl.classList.add('has-resume');
+                } else {
+                    valueEl.textContent = 'No resume on file. Upload one below.';
+                    valueEl.classList.remove('has-resume');
+                }
+            } else {
+                if (nameEl) nameEl.textContent = '';
+                if (emailEl) emailEl.textContent = '';
+                valueEl.textContent = 'Resume is for employee profiles only.';
+                valueEl.classList.remove('has-resume');
+            }
+        })
+        .catch(function () { valueEl.textContent = 'Could not load profile.'; });
+}
+
+function formatResumeDate(iso) {
+    if (!iso) return '';
+    try {
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (e) { return ''; }
+}
+
+function applyStoredTheme() {
+    var theme = localStorage.getItem(THEME_STORAGE_KEY) || 'dark';
+    document.body.setAttribute('data-theme', theme);
+}
+
+function setupThemeToggle() {
+    var toggles = document.querySelectorAll('.theme-toggle');
+    function updateAccessibility() {
+        var theme = document.body.getAttribute('data-theme') || 'dark';
+        var title = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+        var isDark = theme === 'dark';
+        toggles.forEach(function (el) {
+            el.setAttribute('title', title);
+            el.setAttribute('aria-checked', isDark ? 'true' : 'false');
+        });
+    }
+    updateAccessibility();
+    toggles.forEach(function (el) {
+        el.addEventListener('click', function () {
+            var theme = document.body.getAttribute('data-theme') || 'dark';
+            var next = theme === 'dark' ? 'light' : 'dark';
+            document.body.setAttribute('data-theme', next);
+            localStorage.setItem(THEME_STORAGE_KEY, next);
+            updateAccessibility();
+        });
+    });
 }
 
 function resetManagerPanel() {
@@ -383,10 +470,11 @@ function setupResumeUploadForm() {
             var response = await fetch(RESUME_API_BASE + '/api/resume/upload', { method: 'POST', body: formData });
             var result = await response.json();
             if (response.ok) {
-                showUploadMessage('Resume uploaded successfully!', 'success');
+                showUploadMessage('Resume saved to your profile.', 'success');
                 form.reset();
                 fileLabel.textContent = 'Choose file...';
                 fileLabel.classList.remove('file-selected');
+                loadEmployeeProfile();
             } else {
                 showUploadMessage(result.message || 'Upload failed. Please try again.', 'error');
             }
@@ -711,6 +799,20 @@ function setupManagerFlow() {
     var employeePopoutClose = document.getElementById('employee-popout-close');
     var employeePopoutTitle = document.getElementById('employee-popout-title');
     var employeePopoutContent = document.getElementById('employee-popout-content');
+    var employeePopoutSingle = document.getElementById('employee-popout-single');
+    var employeePopoutCompare = document.getElementById('employee-popout-compare');
+    var compareNameA = document.getElementById('employee-popout-compare-name-a');
+    var compareContentA = document.getElementById('employee-popout-compare-content-a');
+    var compareNameB = document.getElementById('employee-popout-compare-name-b');
+    var compareContentB = document.getElementById('employee-popout-compare-content-b');
+    var compareBtn = document.getElementById('employee-popout-compare-btn');
+    var backSingleBtn = document.getElementById('employee-popout-back-single');
+    var compareHint = document.getElementById('employee-popout-compare-hint');
+    var popoutResizeHandle = document.getElementById('employee-popout-resize');
+
+    var compareMode = false;
+    var firstEmployeeForCompare = null;
+    var popoutHeightPx = null;
 
     var selectedJobId = null;
     var selectedJobTitle = null;
@@ -965,11 +1067,35 @@ function setupManagerFlow() {
         });
     }
 
+    var popoutDragBtn = document.getElementById('employee-popout-drag');
+    function setPopoutCollapsed(collapsed) {
+        if (collapsed) {
+            employeePopout.classList.add('employee-popout--collapsed');
+            if (popoutDragBtn) popoutDragBtn.textContent = '▲';
+        } else {
+            employeePopout.classList.remove('employee-popout--collapsed');
+            if (popoutDragBtn) popoutDragBtn.textContent = '▼';
+        }
+    }
+
+    function showSingleView() {
+        if (employeePopoutSingle) employeePopoutSingle.style.display = '';
+        if (employeePopoutCompare) employeePopoutCompare.style.display = 'none';
+        if (compareBtn) compareBtn.style.display = '';
+        if (backSingleBtn) backSingleBtn.style.display = 'none';
+        if (compareHint) compareHint.style.display = 'none';
+        compareMode = false;
+        firstEmployeeForCompare = null;
+    }
+
     function openEmployeePopout(employeeId, employeeName) {
+        showSingleView();
         employeePopoutTitle.textContent = 'Match explanation: ' + employeeName;
         employeePopoutContent.textContent = 'Loading AI explanation…';
         employeePopout.classList.remove('employee-popout--closed');
         employeePopout.classList.add('employee-popout--open');
+        setPopoutCollapsed(false);
+        applyPopoutHeight();
 
         var popoutHeaders = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
         fetch('/api/chat', {
@@ -991,10 +1117,118 @@ function setupManagerFlow() {
             });
     }
 
+    function addSecondEmployeeForCompare(employeeId, employeeName) {
+        if (!firstEmployeeForCompare) return;
+        compareContentB.textContent = 'Loading…';
+        compareNameA.textContent = firstEmployeeForCompare.name;
+        compareContentA.textContent = firstEmployeeForCompare.content;
+        compareNameB.textContent = employeeName;
+        employeePopoutSingle.style.display = 'none';
+        employeePopoutCompare.style.display = 'grid';
+        compareBtn.style.display = 'none';
+        backSingleBtn.style.display = '';
+        compareHint.style.display = 'none';
+
+        var popoutHeaders = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
+        fetch('/api/chat', {
+            method: 'POST',
+            headers: popoutHeaders,
+            body: JSON.stringify({
+                preset: 'explain_employee_match',
+                jobId: selectedJobId,
+                employeeId: employeeId
+            })
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                var text = (data && data.response) ? data.response : (data && data.message) ? data.message : 'No explanation available.';
+                compareContentB.textContent = text;
+            })
+            .catch(function () {
+                compareContentB.textContent = 'Could not load explanation.';
+            });
+        compareMode = false;
+        firstEmployeeForCompare = null;
+    }
+
+    function startCompareMode() {
+        compareMode = true;
+        firstEmployeeForCompare = {
+            id: null,
+            name: employeePopoutTitle.textContent.replace(/^Match explanation:\s*/i, ''),
+            content: employeePopoutContent.textContent
+        };
+        compareHint.style.display = 'block';
+        compareHint.textContent = 'Click another employee above to compare.';
+    }
+
     function closeEmployeePopout() {
         employeePopout.classList.add('employee-popout--closed');
         employeePopout.classList.remove('employee-popout--open');
+        employeePopout.classList.remove('employee-popout--collapsed');
+        if (popoutDragBtn) popoutDragBtn.textContent = '▼';
+        showSingleView();
+        if (employeePopout.style.height) employeePopout.style.height = '';
     }
 
+    function applyPopoutHeight() {
+        if (!employeePopout.classList.contains('employee-popout--open') || employeePopout.classList.contains('employee-popout--collapsed')) return;
+        if (popoutHeightPx != null) {
+            employeePopout.style.maxHeight = '';
+            employeePopout.style.height = popoutHeightPx + 'px';
+        } else {
+            employeePopout.style.height = '';
+            employeePopout.style.maxHeight = '50vh';
+        }
+    }
+
+    function setupPopoutResize() {
+        if (!popoutResizeHandle) return;
+        var minH = 120;
+        var maxH = Math.max(200, window.innerHeight * 0.9);
+
+        popoutResizeHandle.addEventListener('mousedown', function (e) {
+            if (!employeePopout.classList.contains('employee-popout--open') || employeePopout.classList.contains('employee-popout--collapsed')) return;
+            e.preventDefault();
+            var startY = e.clientY;
+            var startHeight = popoutHeightPx != null ? popoutHeightPx : Math.min(400, window.innerHeight * 0.5);
+            if (employeePopout.style.height) startHeight = parseInt(employeePopout.style.height, 10) || startHeight;
+            employeePopout.classList.add('employee-popout--resizing');
+
+            function onMove(e) {
+                var dy = startY - e.clientY;
+                var newH = Math.min(maxH, Math.max(minH, startHeight + dy));
+                popoutHeightPx = newH;
+                employeePopout.style.maxHeight = '';
+                employeePopout.style.height = newH + 'px';
+            }
+            function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                employeePopout.classList.remove('employee-popout--resizing');
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+    }
+
+    if (compareBtn) compareBtn.addEventListener('click', startCompareMode);
+    if (backSingleBtn) backSingleBtn.addEventListener('click', function () {
+        var name = compareNameA ? compareNameA.textContent : '';
+        var content = compareContentA ? compareContentA.textContent : '';
+        showSingleView();
+        employeePopoutTitle.textContent = 'Match explanation: ' + name;
+        employeePopoutContent.textContent = content;
+    });
+    setupPopoutResize();
+
     if (employeePopoutClose) employeePopoutClose.addEventListener('click', closeEmployeePopout);
+    if (popoutDragBtn) {
+        popoutDragBtn.addEventListener('click', function () {
+            if (!employeePopout.classList.contains('employee-popout--open')) return;
+            var collapsed = employeePopout.classList.toggle('employee-popout--collapsed');
+            popoutDragBtn.textContent = collapsed ? '▲' : '▼';
+            if (!collapsed) applyPopoutHeight();
+        });
+    }
 }
