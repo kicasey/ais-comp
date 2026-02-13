@@ -672,19 +672,24 @@ function escapeHtml(s) {
     return div.innerHTML;
 }
 
-// Replace resume UUIDs and "Candidate xxxx" placeholders with real names
+// Replace resume UUIDs, "Candidate xxxx", and "Resume xxxx" placeholders with real names
 function replaceIdsWithNames(text, data) {
     if (!text || !data) return text;
     var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
     var nameMap = item && item.id_to_name ? item.id_to_name : {};
     for (var id in nameMap) {
-        if (nameMap.hasOwnProperty(id) && nameMap[id]) {
-            // Replace full UUID
-            text = text.split(id).join(nameMap[id]);
-            // Replace "Candidate xxxx" where xxxx is first 8 chars of the UUID
-            var short = id.substring(0, 8);
-            text = text.split('Candidate ' + short).join(nameMap[id]);
-        }
+        if (!nameMap.hasOwnProperty(id) || !nameMap[id]) continue;
+        var name = nameMap[id];
+        // Replace full UUID
+        text = text.split(id).join(name);
+        var short = id.substring(0, 8);
+        // Replace "Candidate xxxx" (first 8 chars of UUID)
+        text = text.split('Candidate ' + short).join(name);
+        // Replace "Resume xxxx" (no spaces) with name
+        text = text.split('Resume ' + short).join(name);
+        // Replace "Resume x x x x ..." (8-char hex with optional spaces) with name
+        var regex = new RegExp('Resume\\s+' + short.split('').join('\\s*') + '(?![0-9a-fA-F])', 'g');
+        text = text.replace(regex, name);
     }
     return text;
 }

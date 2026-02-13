@@ -426,13 +426,14 @@ body.page--landing .ey-logo-bottom {
 }
 .form-group--file {
     position: relative;
-    width: 160px;
+    width: fit-content;
+    min-width: 160px;
 }
 .file-input-native {
     position: absolute;
     left: 0;
     top: 0;
-    width: 160px;
+    width: 100%;
     height: 40px;
     opacity: 0;
     cursor: pointer;
@@ -440,7 +441,9 @@ body.page--landing .ey-logo-bottom {
 }
 .file-input-label {
     display: block;
-    width: 160px;
+    width: fit-content;
+    min-width: 160px;
+    max-width: min(100%, 420px);
     padding: 0.5rem 0.75rem;
     border: 1px dashed var(--ey-border);
     border-radius: 6px;
@@ -449,6 +452,9 @@ body.page--landing .ey-logo-bottom {
     font-size: 0.9rem;
     cursor: pointer;
     transition: border-color 0.2s ease, color 0.2s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .form-group--file .file-input-native:focus + .file-input-label,
 .form-group--file:focus-within .file-input-label {
@@ -562,8 +568,8 @@ body.page--landing .ey-logo-bottom {
     margin-bottom: 1.5rem;
 }
 .chat-messages {
-    min-height: 180px;
-    max-height: 320px;
+    min-height: 280px;
+    max-height: 520px;
     overflow-y: auto;
     padding: 1rem;
     background: var(--ey-bg);
@@ -977,6 +983,10 @@ body.page--landing .ey-logo-bottom {
 
 .chat-section--manager {
     margin-top: 1rem;
+}
+.chat-section--manager .chat-messages {
+    min-height: 280px;
+    max-height: 520px;
 }
 
 
