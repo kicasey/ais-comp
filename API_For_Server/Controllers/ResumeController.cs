@@ -131,7 +131,7 @@ public class ResumeController : ControllerBase
             client.Timeout = TimeSpan.FromSeconds(60);
 
             using var content = new MultipartFormDataContent();
-            var stream = file.OpenReadStream();
+            await using var stream = file.OpenReadStream();
             var streamContent = new StreamContent(stream);
             streamContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType ?? "application/octet-stream");
             content.Add(streamContent, "files", file.FileName);

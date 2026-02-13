@@ -26,7 +26,7 @@ public class EmployeeChatController : ControllerBase
             var body = await response.Content.ReadAsStringAsync(ct);
             _logger.LogInformation("Employee chat webhook returned {StatusCode}", response.StatusCode);
             if (string.IsNullOrEmpty(body))
-                return StatusCode((int)response.StatusCode);
+                return StatusCode((int)response.StatusCode, new { response = "The assistant did not return a response. Please try again." });
             try
             {
                 return StatusCode((int)response.StatusCode, System.Text.Json.JsonSerializer.Deserialize<object>(body));

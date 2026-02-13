@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -8,7 +9,8 @@ using TalentStrategyAI.API.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(o => o.JsonSerializerOptions.NumberHandling = JsonNumberHandling.AllowReadingFromString);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -58,6 +60,7 @@ builder.Services.AddCors(options =>
 
 // Register services
 builder.Services.AddScoped<IOpenAIService, OpenAIService>();
+builder.Services.AddScoped<IResumeTextService, ResumeTextService>();
 
 // HttpClient for resume-api.campbellthompson.com (chat, jobs, recommendations)
 var resumeApiBase = builder.Configuration["ResumeApi:BaseUrl"];
@@ -66,7 +69,7 @@ if (!string.IsNullOrWhiteSpace(resumeApiBase))
     builder.Services.AddHttpClient("ResumeApi", client =>
     {
         client.BaseAddress = new Uri(resumeApiBase.TrimEnd('/') + "/");
-        client.Timeout = TimeSpan.FromSeconds(30);
+        client.Timeout = TimeSpan.FromSeconds(120);
     });
 }
 
@@ -94,12 +97,13 @@ app.UseStaticFiles();
 // Map controllers
 app.MapControllers();
 
-// Seed test users from TestData/sample-logins.json if database is empty
+// Seed test users from TestData/sample-logins.json (add missing; in Dev, sync passwords)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    await DataSeeder.SeedAsync(db, logger);
+    var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+    await DataSeeder.SeedAsync(db, logger, env.IsDevelopment());
 }
 
 app.Run();

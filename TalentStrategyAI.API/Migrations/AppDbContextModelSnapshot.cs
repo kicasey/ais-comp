@@ -33,6 +33,15 @@ namespace TalentStrategyAI.API.Migrations
                     b.Property<string>("Position")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ResumeFileName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ResumeFilePath")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ResumeUploadedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<int?>("UserId")
                         .HasColumnType("INTEGER");
 

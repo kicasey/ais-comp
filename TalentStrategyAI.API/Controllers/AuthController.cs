@@ -34,14 +34,17 @@ public class AuthController : ControllerBase
         }
 
         var email = request.Email.Trim().ToLowerInvariant();
+        var password = request.Password ?? "";
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email);
         if (user == null)
         {
             return Unauthorized(new { message = "Invalid email or password." });
         }
 
-        if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        if (!BCrypt.Net.BCrypt.Verify(password.Trim(), user.PasswordHash))
         {
+            if (HttpContext.RequestServices.GetService<IWebHostEnvironment>()?.IsDevelopment() == true)
+                _logger.LogWarning("Login failed for {Email}: password mismatch (user exists, BCrypt verify failed).", email);
             return Unauthorized(new { message = "Invalid email or password." });
         }
 

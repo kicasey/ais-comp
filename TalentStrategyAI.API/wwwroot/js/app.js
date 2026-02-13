@@ -7,12 +7,17 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeApp();
 });
 
+var THEME_STORAGE_KEY = 'talentStrategyTheme';
+
 function initializeApp() {
+    applyStoredTheme();
     ensureAuthGate();
     setupLanding();
     setupBackButton();
     setupAuth();
     setupResumeUploadForm();
+    loadEmployeeProfileWhenNeeded();
+    setupThemeToggle();
     setupChatPresets('employee');
     setupChatPresets('manager');
     setupChatSendButtons();
@@ -316,7 +321,89 @@ function showAppByRole(role) {
     } else {
         if (emp) emp.classList.remove('interface--hidden');
         if (mgr) mgr.classList.add('interface--hidden');
+        loadEmployeeProfile();
     }
+}
+
+function loadEmployeeProfileWhenNeeded() {
+    var auth = getStoredAuth();
+    if (!auth || (auth.role || '').toLowerCase() !== 'employee') return;
+    var emp = document.getElementById('interface-employee');
+    if (emp && !emp.classList.contains('interface--hidden')) loadEmployeeProfile();
+}
+
+function loadEmployeeProfile() {
+    var nameEl = document.getElementById('profile-name');
+    var emailEl = document.getElementById('profile-email');
+    var valueEl = document.getElementById('profile-resume-value');
+    if (!valueEl) return;
+    var headers = getAuthHeader();
+    if (!headers.Authorization) {
+        if (nameEl) nameEl.textContent = '';
+        if (emailEl) emailEl.textContent = '';
+        valueEl.textContent = 'Sign in to see your profile.';
+        return;
+    }
+    valueEl.textContent = 'Loading…';
+    fetch('/api/resume/profile', { headers: headers })
+        .then(function (res) { return res.json().catch(function () { return null; }); })
+        .then(function (data) {
+            if (!data) { valueEl.textContent = 'Could not load profile.'; return; }
+            if (data.isEmployee) {
+                if (nameEl) nameEl.textContent = (data.displayName || data.name || '').trim() || '—';
+                if (emailEl) emailEl.textContent = (data.email || '').trim() || '—';
+                if (data.hasResume && data.resumeFileName) {
+                    valueEl.textContent = data.resumeFileName + (data.resumeUploadedAt ? ' (uploaded ' + formatResumeDate(data.resumeUploadedAt) + ')' : '');
+                    valueEl.classList.add('has-resume');
+                } else {
+                    valueEl.textContent = 'No resume on file. Upload one below.';
+                    valueEl.classList.remove('has-resume');
+                }
+            } else {
+                if (nameEl) nameEl.textContent = '';
+                if (emailEl) emailEl.textContent = '';
+                valueEl.textContent = 'Resume is for employee profiles only.';
+                valueEl.classList.remove('has-resume');
+            }
+        })
+        .catch(function () { valueEl.textContent = 'Could not load profile.'; });
+}
+
+function formatResumeDate(iso) {
+    if (!iso) return '';
+    try {
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (e) { return ''; }
+}
+
+function applyStoredTheme() {
+    var theme = localStorage.getItem(THEME_STORAGE_KEY) || 'dark';
+    document.body.setAttribute('data-theme', theme);
+}
+
+function setupThemeToggle() {
+    var toggles = document.querySelectorAll('.theme-toggle');
+    function updateAccessibility() {
+        var theme = document.body.getAttribute('data-theme') || 'dark';
+        var title = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+        var isDark = theme === 'dark';
+        toggles.forEach(function (el) {
+            el.setAttribute('title', title);
+            el.setAttribute('aria-checked', isDark ? 'true' : 'false');
+        });
+    }
+    updateAccessibility();
+    toggles.forEach(function (el) {
+        el.addEventListener('click', function () {
+            var theme = document.body.getAttribute('data-theme') || 'dark';
+            var next = theme === 'dark' ? 'light' : 'dark';
+            document.body.setAttribute('data-theme', next);
+            localStorage.setItem(THEME_STORAGE_KEY, next);
+            updateAccessibility();
+        });
+    });
 }
 
 function resetManagerPanel() {
@@ -385,10 +472,11 @@ function setupResumeUploadForm() {
             var response = await fetch(RESUME_API_BASE + '/api/resume/upload', { method: 'POST', body: formData });
             var result = await response.json();
             if (response.ok) {
-                showUploadMessage('Resume uploaded successfully!', 'success');
+                showUploadMessage('Resume saved to your profile.', 'success');
                 form.reset();
                 fileLabel.textContent = 'Choose file...';
                 fileLabel.classList.remove('file-selected');
+                loadEmployeeProfile();
             } else {
                 showUploadMessage(result.message || 'Upload failed. Please try again.', 'error');
             }
@@ -454,13 +542,14 @@ function setupChatSendButtons() {
         if (auth) {
             payload.userEmail = auth.email || '';
             payload.userName = auth.displayName || '';
-            payload.userId = auth.userId || '';
+            payload.userId = String(auth.userId || '');
         }
         appendChatMessage(messagesEl, 'You', text, 'user');
         var loadingId = 'loading-' + Date.now();
         appendChatMessage(messagesEl, 'Assistant', '…', 'assistant', true, loadingId);
         var headers = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
-        fetch(RESUME_API_BASE + endpoint, {
+        var chatUrl = (endpoint === '/api/chat' || endpoint === '/api/employee-chat') ? endpoint : (RESUME_API_BASE + endpoint);
+        fetch(chatUrl, {
             method: 'POST',
             headers: headers,
             body: JSON.stringify(payload)
@@ -479,12 +568,14 @@ function setupChatSendButtons() {
                     appendChatMessage(messagesEl, 'Assistant', 'No response received. You may need to upload your resume first.', 'assistant');
                     return;
                 }
+                var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
                 var structured = formatResumeApiStructuredBlock(data);
                 if (structured) {
                     appendChatMessage(messagesEl, 'Assistant', structured, 'assistant', false, undefined, true);
                 } else {
-                    var responseText = (data && data.response) ? data.response : (data && data.message) ? data.message : 'Done.';
-                    appendChatMessage(messagesEl, 'Assistant', responseText, 'assistant');
+                    var responseText = (item && item.response) ? item.response : (item && item.message) ? item.message : (typeof item === 'string') ? item : 'Done.';
+                    responseText = replaceIdsWithNames(responseText, data);
+                    appendChatMessage(messagesEl, 'Assistant', formatChatMessageMarkdown(fixSpacing(responseText)), 'assistant', false, undefined, true);
                 }
             })
             .catch(function (err) {
@@ -517,18 +608,19 @@ function setupChatSendButtons() {
 function sendPresetAndShowResponse(preset, messagesEl, chatEndpoint) {
     var endpoint = chatEndpoint || '/api/chat';
     var auth = getStoredAuth();
-    var payload = { preset: preset };
+    var payload = { preset: preset, customText: getPresetLabel(preset) };
     if (auth) {
         payload.userEmail = auth.email || '';
         payload.userName = auth.displayName || '';
-        payload.userId = auth.userId || '';
+        payload.userId = String(auth.userId || '');
     }
     appendChatMessage(messagesEl, 'You', getPresetLabel(preset), 'user');
     var loadingId = 'loading-' + Date.now();
     appendChatMessage(messagesEl, 'Assistant', '…', 'assistant', true, loadingId);
 
     var headers = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
-    fetch(RESUME_API_BASE + endpoint, {
+    var chatUrl = (endpoint === '/api/chat' || endpoint === '/api/employee-chat') ? endpoint : (RESUME_API_BASE + endpoint);
+    fetch(chatUrl, {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(payload)
@@ -547,12 +639,14 @@ function sendPresetAndShowResponse(preset, messagesEl, chatEndpoint) {
                 appendChatMessage(messagesEl, 'Assistant', 'No response received. You may need to upload your resume first.', 'assistant');
                 return;
             }
+            var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
             var structured = formatResumeApiStructuredBlock(data);
             if (structured) {
                 appendChatMessage(messagesEl, 'Assistant', structured, 'assistant', false, undefined, true);
             } else {
-                var text = (data && data.response) ? data.response : (data && data.message) ? data.message : (typeof data === 'string') ? data : 'Done.';
-                appendChatMessage(messagesEl, 'Assistant', text, 'assistant');
+                var text = (item && item.response) ? item.response : (item && item.message) ? item.message : (typeof item === 'string') ? item : 'Done.';
+                text = replaceIdsWithNames(text, data);
+                appendChatMessage(messagesEl, 'Assistant', formatChatMessageMarkdown(fixSpacing(text)), 'assistant', false, undefined, true);
             }
         })
         .catch(function (err) {
@@ -591,22 +685,66 @@ function formatResumeApiStructuredBlock(data) {
     if (!item || typeof item !== 'object') return null;
     var msg = item.assistant_message;
     var question = item.clarifying_question;
-    var candidates = item.top_candidates;
+
+    // Parse candidates from response text first (has proper spacing)
+    var candidates = null;
+    if (item.response) {
+        var raw = item.response;
+        raw = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
+        try {
+            var full = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+            if (full && full.top_candidates && full.top_candidates.length > 0) candidates = full.top_candidates;
+            if (!msg && full && full.assistant_message) msg = full.assistant_message;
+        } catch (e) {
+            var idx = raw.indexOf('"top_candidates"');
+            if (idx !== -1) {
+                var brace = raw.lastIndexOf('{', idx);
+                if (brace !== -1) {
+                    var depth = 0, endIdx = -1;
+                    for (var i = brace; i < raw.length; i++) {
+                        if (raw[i] === '{') depth++;
+                        else if (raw[i] === '}') { depth--; if (depth === 0) { endIdx = i + 1; break; } }
+                    }
+                    if (endIdx !== -1) {
+                        try {
+                            var parsed = JSON.parse(raw.substring(brace, endIdx));
+                            if (parsed.top_candidates && parsed.top_candidates.length > 0) candidates = parsed.top_candidates;
+                            if (!msg && parsed.assistant_message) msg = parsed.assistant_message;
+                        } catch (e2) {}
+                    }
+                }
+            }
+        }
+    }
+    // Fallback to top-level top_candidates
+    if ((!candidates || candidates.length === 0) && item.top_candidates) {
+        candidates = item.top_candidates;
+    }
+    // Enrich names from id_to_name
+    if (candidates && candidates.length > 0 && item.id_to_name) {
+        var nameMap = item.id_to_name;
+        for (var j = 0; j < candidates.length; j++) {
+            if (candidates[j].resume_id && nameMap[candidates[j].resume_id]) {
+                candidates[j].candidate_name = nameMap[candidates[j].resume_id];
+            }
+        }
+    }
+
     if (!msg && !question && (!candidates || !candidates.length)) return null;
     var html = '';
-    if (msg) html += '<p class="chat-structured__message">' + escapeHtml(msg) + '</p>';
-    if (question) html += '<p class="chat-structured__question"><strong>Clarifying:</strong> ' + escapeHtml(question) + '</p>';
+    if (msg) { msg = replaceIdsWithNames(msg, data); html += '<div class="chat-structured__message">' + formatChatMessageMarkdown(fixSpacing(msg)) + '</div>'; }
+    if (question) html += '<div class="chat-structured__question"><strong>Clarifying:</strong> ' + formatChatMessageMarkdown(fixSpacing(question)) + '</div>';
     if (candidates && candidates.length > 0) {
         html += '<div class="chat-structured__candidates"><strong>Top candidates</strong><ul>';
         for (var i = 0; i < candidates.length; i++) {
             var c = candidates[i];
             var name = (c.candidate_name || c.display || 'Unknown').toString();
             var score = c.score != null ? c.score + '%' : '';
-            var reason = (c.reason || '').toString().slice(0, 120);
-            if (reason.length === 120) reason += '…';
+            var reason = (c.reason || '').toString();
+            reason = reason ? formatChatMessageMarkdown(fixSpacing(replaceIdsWithNames(reason, data))) : '';
             html += '<li><span class="chat-structured__name">' + escapeHtml(name) + '</span>' +
                 (score ? ' <span class="chat-structured__score">' + escapeHtml(score) + '</span>' : '') +
-                (reason ? ' — ' + escapeHtml(reason) : '') + '</li>';
+                (reason ? ' — ' + reason : '') + '</li>';
         }
         html += '</ul></div>';
     }
@@ -624,26 +762,50 @@ function escapeHtml(s) {
     return div.innerHTML;
 }
 
-// ----- Custom manager jobs: stored locally so managers can add roles -----
-var CUSTOM_JOBS_STORAGE_KEY = 'talentStrategyCustomJobs';
-
-function loadCustomJobs() {
-    try {
-        var raw = localStorage.getItem(CUSTOM_JOBS_STORAGE_KEY);
-        if (!raw) return [];
-        var parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-        return [];
+// Replace resume UUIDs, "Candidate xxxx", and "Resume xxxx" placeholders with real names
+function replaceIdsWithNames(text, data) {
+    if (!text || !data) return text;
+    var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
+    var nameMap = item && item.id_to_name ? item.id_to_name : {};
+    for (var id in nameMap) {
+        if (!nameMap.hasOwnProperty(id) || !nameMap[id]) continue;
+        var name = nameMap[id];
+        // Replace full UUID
+        text = text.split(id).join(name);
+        var short = id.substring(0, 8);
+        // Replace "Candidate xxxx" (first 8 chars of UUID)
+        text = text.split('Candidate ' + short).join(name);
+        // Replace "Resume xxxx" (no spaces) with name
+        text = text.split('Resume ' + short).join(name);
+        // Replace "Resume x x x x ..." (8-char hex with optional spaces) with name
+        var regex = new RegExp('Resume\\s+' + short.split('').join('\\s*') + '(?![0-9a-fA-F])', 'g');
+        text = text.replace(regex, name);
     }
+    return text;
 }
 
-function saveCustomJobs(list) {
-    try {
-        localStorage.setItem(CUSTOM_JOBS_STORAGE_KEY, JSON.stringify(list || []));
-    } catch (e) {
-        // ignore
-    }
+// Fix AI text that has no spaces (e.g. "DualmajorinMIS" -> "Dual major in MIS")
+function fixSpacing(text) {
+    if (!text) return '';
+    var s = text.replace(/([a-z])([A-Z])/g, '$1 $2');
+    s = s.replace(/([0-9])([A-Z])/g, '$1 $2');
+    s = s.replace(/([,.:;])([A-Za-z])/g, '$1 $2');
+    s = s.replace(/([a-z])(\d)/g, '$1 $2');
+    s = s.replace(/(\d)([a-z])/g, '$1 $2');
+    return s;
+}
+
+// Convert markdown-style assistant text to safe HTML (escape first, then **bold**, *italic*, newlines, lists)
+function formatChatMessageMarkdown(text) {
+    if (!text) return '';
+    var s = escapeHtml(text);
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    s = s.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    s = s.replace(/_([^_]+)_/g, '<em>$1</em>');
+    s = s.replace(/\n\n+/g, '</p><p>');
+    s = s.replace(/\n/g, '<br>');
+    return '<p>' + s + '</p>';
 }
 
 // ----- Manager flow: jobs list → job panel → recommend employees → employee popout (AI explanation) -----
@@ -660,11 +822,20 @@ function setupManagerFlow() {
     var employeePopoutClose = document.getElementById('employee-popout-close');
     var employeePopoutTitle = document.getElementById('employee-popout-title');
     var employeePopoutContent = document.getElementById('employee-popout-content');
-    var btnAddJob = document.getElementById('btn-add-job');
-    var addJobPanel = document.getElementById('add-job-panel');
-    var addJobForm = document.getElementById('add-job-form');
-    var addJobCancel = document.getElementById('add-job-cancel');
-    var addJobMessage = document.getElementById('add-job-message');
+    var employeePopoutSingle = document.getElementById('employee-popout-single');
+    var employeePopoutCompare = document.getElementById('employee-popout-compare');
+    var compareNameA = document.getElementById('employee-popout-compare-name-a');
+    var compareContentA = document.getElementById('employee-popout-compare-content-a');
+    var compareNameB = document.getElementById('employee-popout-compare-name-b');
+    var compareContentB = document.getElementById('employee-popout-compare-content-b');
+    var compareBtn = document.getElementById('employee-popout-compare-btn');
+    var backSingleBtn = document.getElementById('employee-popout-back-single');
+    var compareHint = document.getElementById('employee-popout-compare-hint');
+    var popoutResizeHandle = document.getElementById('employee-popout-resize');
+
+    var compareMode = false;
+    var firstEmployeeForCompare = null;
+    var popoutHeightPx = null;
 
     var selectedJobId = null;
     var selectedJobTitle = null;
@@ -802,38 +973,178 @@ function setupManagerFlow() {
             recommendationsWrap.style.display = 'block';
             if (recommendationsJobTitle) recommendationsJobTitle.textContent = ' for "' + (selectedJobTitle || '') + '"';
             var recHeaders = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
-            fetch(RESUME_API_BASE + '/api/chat', {
+            // Store last AI candidates so popout can access details
+            var lastCandidates = [];
+
+            function renderCandidates(candidates) {
+                if (!candidates || candidates.length === 0) {
+                    recommendationsListEl.innerHTML = '<p class="placeholder-text">No recommendations returned.</p>';
+                    return;
+                }
+                lastCandidates = candidates;
+                recommendationsListEl.innerHTML = '';
+                candidates.slice(0, 10).forEach(function (c) {
+                    var name = c.candidate_name || c.name || c.display || c.resume_id || c.employeeId || '';
+                    var empId = c.resume_id || c.employeeId || '';
+                    var pct = c.score != null ? c.score : (c.confidencePercent != null ? c.confidencePercent : null);
+                    var card = document.createElement('button');
+                    card.type = 'button';
+                    card.className = 'recommendation-card';
+                    card.setAttribute('data-employee-id', empId);
+                    card.setAttribute('data-employee-name', name);
+                    card.innerHTML = '<span class="recommendation-card__name">' + escapeHtml(name) + '</span>' +
+                        '<span class="recommendation-card__pct">' + (pct != null ? pct + '%' : '—') + '</span>';
+                    card.addEventListener('click', function () {
+                        openCandidateDetail(c, name);
+                    });
+                    recommendationsListEl.appendChild(card);
+                });
+            }
+
+            function generateUpskillSteps(gaps) {
+                if (!gaps || gaps.length === 0) return [];
+                return gaps.map(function (gap) {
+                    var lower = gap.toLowerCase();
+                    if (lower.indexOf('cpa') !== -1 || lower.indexOf('accounting') !== -1 || lower.indexOf('audit') !== -1)
+                        return { step: 'CPA Certification Prep', desc: 'Enroll in a CPA review course (e.g., Becker, Roger CPA) to build accounting and audit foundations.' };
+                    if (lower.indexOf('experience') !== -1 || lower.indexOf('years') !== -1 || lower.indexOf('professional') !== -1)
+                        return { step: 'Mentorship & On-the-Job Training', desc: 'Pair with a senior team member for hands-on project exposure and accelerated skill development.' };
+                    if (lower.indexOf('certif') !== -1)
+                        return { step: 'Professional Certification', desc: 'Pursue relevant industry certifications to validate skills and close credentialing gaps.' };
+                    if (lower.indexOf('consult') !== -1 || lower.indexOf('client') !== -1 || lower.indexOf('advisory') !== -1)
+                        return { step: 'Consulting Skills Workshop', desc: 'Complete a consulting methodology or client advisory training program.' };
+                    if (lower.indexOf('gaap') !== -1 || lower.indexOf('ifrs') !== -1 || lower.indexOf('sox') !== -1 || lower.indexOf('pcaob') !== -1 || lower.indexOf('coso') !== -1)
+                        return { step: 'Regulatory & Standards Training', desc: 'Take courses on GAAP, IFRS, SOX, PCAOB, or COSO frameworks as applicable.' };
+                    if (lower.indexOf('leadership') !== -1 || lower.indexOf('manage') !== -1)
+                        return { step: 'Leadership Development Program', desc: 'Join an internal or external leadership development cohort to build management capabilities.' };
+                    if (lower.indexOf('technology') !== -1 || lower.indexOf('technical') !== -1 || lower.indexOf('software') !== -1 || lower.indexOf('coding') !== -1)
+                        return { step: 'Technical Skills Bootcamp', desc: 'Complete targeted training in the specific technologies required for the role.' };
+                    if (lower.indexOf('communication') !== -1 || lower.indexOf('presentation') !== -1)
+                        return { step: 'Communication & Presentation Training', desc: 'Take a business communication or public speaking course to strengthen soft skills.' };
+                    return { step: 'Targeted Training: ' + gap.substring(0, 50), desc: 'Complete relevant EY learning modules or external courses to address this gap.' };
+                });
+            }
+
+            function openCandidateDetail(c, name) {
+                var empId = c.resume_id || c.employeeId || '';
+                var pct = c.score != null ? c.score : (c.confidencePercent != null ? c.confidencePercent : null);
+                var strengths = (c.strengths || []).map(fixSpacing);
+                var gaps = (c.gaps || []).map(fixSpacing);
+                var reason = fixSpacing(c.reason || '');
+
+                var html = '<h3 style="margin:0 0 0.25rem;color:var(--ey-yellow)">' + escapeHtml(name) + '</h3>';
+                if (pct != null) html += '<p style="margin:0 0 0.75rem;font-size:0.9rem;color:#9ca3af">Match score: <strong style="color:var(--ey-yellow)">' + pct + '%</strong></p>';
+                if (reason) html += '<p style="margin:0 0 0.75rem;color:#e5e7eb;line-height:1.5">' + escapeHtml(reason) + '</p>';
+                if (strengths.length > 0) {
+                    html += '<p style="margin:0.75rem 0 0.25rem;font-weight:600;color:var(--ey-yellow)">Strengths</p><ul style="margin:0;padding-left:1.25rem;color:#e5e7eb">';
+                    strengths.forEach(function (s) { html += '<li style="margin-bottom:0.25rem;line-height:1.4">' + escapeHtml(s) + '</li>'; });
+                    html += '</ul>';
+                }
+                if (gaps.length > 0) {
+                    html += '<p style="margin:0.75rem 0 0.25rem;font-weight:600;color:#f87171">Gaps</p><ul style="margin:0;padding-left:1.25rem;color:#e5e7eb">';
+                    gaps.forEach(function (g) { html += '<li style="margin-bottom:0.25rem;line-height:1.4">' + escapeHtml(g) + '</li>'; });
+                    html += '</ul>';
+                }
+
+                // Upskilling plan — generated from gaps, no AI call needed
+                var steps = generateUpskillSteps(gaps);
+                html += '<div style="margin-top:1rem;border-top:1px solid var(--ey-border);padding-top:0.75rem">';
+                html += '<p style="margin:0 0 0.5rem;font-weight:600;color:var(--ey-yellow)">Upskilling Plan</p>';
+                if (steps.length > 0) {
+                    html += '<ol style="margin:0;padding-left:1.25rem;color:#e5e7eb">';
+                    steps.forEach(function (s) {
+                        html += '<li style="margin-bottom:0.5rem;line-height:1.4">';
+                        html += '<strong style="color:var(--ey-yellow)">' + escapeHtml(s.step) + '</strong>';
+                        html += '<br><span style="font-size:0.82rem;color:#d1d5db">' + escapeHtml(s.desc) + '</span>';
+                        html += '</li>';
+                    });
+                    html += '</ol>';
+                } else {
+                    html += '<p style="color:#9ca3af;font-size:0.85rem">No gaps identified — candidate is well-suited for this role.</p>';
+                }
+                html += '</div>';
+
+                employeePopoutTitle.textContent = 'Candidate Details';
+                employeePopoutContent.innerHTML = html;
+                employeePopout.classList.remove('employee-popout--closed');
+                employeePopout.classList.add('employee-popout--open');
+            }
+            fetch('/api/chat', {
                 method: 'POST',
                 headers: recHeaders,
                 body: JSON.stringify({
                     preset: 'recommend_for_job',
-                    customText: 'Give me the top 3 candidates for this position: ' + (selectedJobTitle || selectedJobId) + '. Only return resume_id and confidence score.'
+                    customText: 'INSTRUCTION: You must match every candidate in the database to the job titled "' + (selectedJobTitle || selectedJobId) + '". Score each candidate 0-100 based on how well their skills and experience fit this role. Do NOT ask clarifying questions. Do NOT explain. Use normal English with proper spacing in all text fields. Respond with ONLY this JSON, nothing else: {"top_candidates":[{"candidate_name":"Full Name","resume_id":"the-resume-id","score":85,"strengths":["strength 1"],"gaps":["gap 1"],"reason":"why they match or dont"}]}. Include ALL candidates, ranked by score descending.'
                 })
             })
                 .then(function (res) { return res.ok ? res.json() : Promise.reject(new Error('Failed to load recommendations')); })
                 .then(function (data) {
                     var item = Array.isArray(data) && data.length > 0 ? data[0] : data;
-                    var candidates = (item && item.top_candidates) ? item.top_candidates : [];
-                    if (candidates.length === 0) {
-                        recommendationsListEl.innerHTML = '<p class="placeholder-text">No recommendations returned.</p>';
+                    var candidates = null;
+                    // Always try parsing from the response text first — it preserves proper spacing
+                    if (item && item.response) {
+                        var raw = item.response;
+                        // Strip markdown code fences
+                        raw = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
+                        // Try parsing the whole response as JSON first
+                        try {
+                            var full = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+                            if (full && full.top_candidates && full.top_candidates.length > 0) candidates = full.top_candidates;
+                        } catch (e) { /* not pure JSON */ }
+                        // Try extracting JSON object containing top_candidates
+                        if (!candidates || candidates.length === 0) {
+                            try {
+                                var idx = raw.indexOf('"top_candidates"');
+                                if (idx !== -1) {
+                                    var brace = raw.lastIndexOf('{', idx);
+                                    if (brace !== -1) {
+                                        var depth = 0;
+                                        var endIdx = -1;
+                                        for (var i = brace; i < raw.length; i++) {
+                                            if (raw[i] === '{') depth++;
+                                            else if (raw[i] === '}') { depth--; if (depth === 0) { endIdx = i + 1; break; } }
+                                        }
+                                        if (endIdx !== -1) {
+                                            var parsed = JSON.parse(raw.substring(brace, endIdx));
+                                            if (parsed.top_candidates && parsed.top_candidates.length > 0) candidates = parsed.top_candidates;
+                                        }
+                                    }
+                                }
+                            } catch (e) { /* give up */ }
+                        }
+                    }
+                    // Fallback to top-level top_candidates if response parsing didn't work
+                    if ((!candidates || candidates.length === 0) && item && item.top_candidates) {
+                        candidates = item.top_candidates;
+                    }
+                    // Enrich with real names from id_to_name (AI uses placeholder names like "Candidate 20a9fda3")
+                    if (candidates && candidates.length > 0 && item && item.id_to_name) {
+                        var nameMap = item.id_to_name;
+                        candidates = candidates.map(function (c) {
+                            if (c.resume_id && nameMap[c.resume_id]) {
+                                c.candidate_name = nameMap[c.resume_id];
+                            }
+                            return c;
+                        });
+                    }
+                    if (candidates && candidates.length > 0) {
+                        renderCandidates(candidates);
                         return;
                     }
-                    recommendationsListEl.innerHTML = '';
-                    candidates.slice(0, 3).forEach(function (c) {
-                        var name = c.candidate_name || c.display || c.resume_id || '';
-                        var empId = c.resume_id || '';
-                        var pct = c.score != null ? c.score : null;
-                        var card = document.createElement('button');
-                        card.type = 'button';
-                        card.className = 'recommendation-card';
-                        card.setAttribute('data-employee-id', empId);
-                        card.setAttribute('data-employee-name', name);
-                        card.innerHTML = '<span class="recommendation-card__name">' + escapeHtml(name) + '</span><span class="recommendation-card__pct">' + (pct != null ? pct + '%' : '—') + '</span>';
-                        card.addEventListener('click', function () {
-                            openEmployeePopout(empId, name || 'Employee');
-                        });
-                        recommendationsListEl.appendChild(card);
-                    });
+                    // If AI returned text but no candidates, show message
+                    if (item && item.response) {
+                        var respText = item.response;
+                        try {
+                            var respJson = (typeof respText === 'string') ? JSON.parse(respText) : respText;
+                            if (respJson && respJson.top_candidates && respJson.top_candidates.length === 0) {
+                                recommendationsListEl.innerHTML = '<p class="placeholder-text">No matching candidates found for this role.</p>';
+                                return;
+                            }
+                        } catch (e) { /* not JSON */ }
+                        recommendationsListEl.innerHTML = '<p class="placeholder-text">' + escapeHtml(respText) + '</p>';
+                        return;
+                    }
+                    recommendationsListEl.innerHTML = '<p class="placeholder-text">No recommendations returned.</p>';
                 })
                 .catch(function () {
                     recommendationsListEl.innerHTML = '<p class="placeholder-text">Could not load recommendations.</p>';
@@ -841,14 +1152,38 @@ function setupManagerFlow() {
         });
     }
 
+    var popoutDragBtn = document.getElementById('employee-popout-drag');
+    function setPopoutCollapsed(collapsed) {
+        if (collapsed) {
+            employeePopout.classList.add('employee-popout--collapsed');
+            if (popoutDragBtn) popoutDragBtn.textContent = '▲';
+        } else {
+            employeePopout.classList.remove('employee-popout--collapsed');
+            if (popoutDragBtn) popoutDragBtn.textContent = '▼';
+        }
+    }
+
+    function showSingleView() {
+        if (employeePopoutSingle) employeePopoutSingle.style.display = '';
+        if (employeePopoutCompare) employeePopoutCompare.style.display = 'none';
+        if (compareBtn) compareBtn.style.display = '';
+        if (backSingleBtn) backSingleBtn.style.display = 'none';
+        if (compareHint) compareHint.style.display = 'none';
+        compareMode = false;
+        firstEmployeeForCompare = null;
+    }
+
     function openEmployeePopout(employeeId, employeeName) {
+        showSingleView();
         employeePopoutTitle.textContent = 'Match explanation: ' + employeeName;
         employeePopoutContent.textContent = 'Loading AI explanation…';
         employeePopout.classList.remove('employee-popout--closed');
         employeePopout.classList.add('employee-popout--open');
+        setPopoutCollapsed(false);
+        applyPopoutHeight();
 
         var popoutHeaders = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
-        fetch(RESUME_API_BASE + '/api/chat', {
+        fetch('/api/chat', {
             method: 'POST',
             headers: popoutHeaders,
             body: JSON.stringify({
@@ -867,74 +1202,118 @@ function setupManagerFlow() {
             });
     }
 
+    function addSecondEmployeeForCompare(employeeId, employeeName) {
+        if (!firstEmployeeForCompare) return;
+        compareContentB.textContent = 'Loading…';
+        compareNameA.textContent = firstEmployeeForCompare.name;
+        compareContentA.textContent = firstEmployeeForCompare.content;
+        compareNameB.textContent = employeeName;
+        employeePopoutSingle.style.display = 'none';
+        employeePopoutCompare.style.display = 'grid';
+        compareBtn.style.display = 'none';
+        backSingleBtn.style.display = '';
+        compareHint.style.display = 'none';
+
+        var popoutHeaders = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeader());
+        fetch('/api/chat', {
+            method: 'POST',
+            headers: popoutHeaders,
+            body: JSON.stringify({
+                preset: 'explain_employee_match',
+                jobId: selectedJobId,
+                employeeId: employeeId
+            })
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                var text = (data && data.response) ? data.response : (data && data.message) ? data.message : 'No explanation available.';
+                compareContentB.textContent = text;
+            })
+            .catch(function () {
+                compareContentB.textContent = 'Could not load explanation.';
+            });
+        compareMode = false;
+        firstEmployeeForCompare = null;
+    }
+
+    function startCompareMode() {
+        compareMode = true;
+        firstEmployeeForCompare = {
+            id: null,
+            name: employeePopoutTitle.textContent.replace(/^Match explanation:\s*/i, ''),
+            content: employeePopoutContent.textContent
+        };
+        compareHint.style.display = 'block';
+        compareHint.textContent = 'Click another employee above to compare.';
+    }
+
     function closeEmployeePopout() {
         employeePopout.classList.add('employee-popout--closed');
         employeePopout.classList.remove('employee-popout--open');
+        employeePopout.classList.remove('employee-popout--collapsed');
+        if (popoutDragBtn) popoutDragBtn.textContent = '▼';
+        showSingleView();
+        if (employeePopout.style.height) employeePopout.style.height = '';
     }
 
-    if (employeePopoutClose) employeePopoutClose.addEventListener('click', closeEmployeePopout);
-
-    // Function to attach add job button handler
-    function attachAddJobHandler() {
-        var btn = document.getElementById('btn-add-job');
-        var panel = document.getElementById('add-job-panel');
-        if (btn && !btn.hasAttribute('data-handler-attached')) {
-            btn.setAttribute('data-handler-attached', 'true');
-            btn.addEventListener('click', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                if (panel) {
-                    if (panel.hasAttribute('hidden') || panel.hidden) {
-                        showAddJobPanel();
-                    } else {
-                        hideAddJobPanel();
-                    }
-                }
-            });
+    function applyPopoutHeight() {
+        if (!employeePopout.classList.contains('employee-popout--open') || employeePopout.classList.contains('employee-popout--collapsed')) return;
+        if (popoutHeightPx != null) {
+            employeePopout.style.maxHeight = '';
+            employeePopout.style.height = popoutHeightPx + 'px';
+        } else {
+            employeePopout.style.height = '';
+            employeePopout.style.maxHeight = '50vh';
         }
     }
 
-    // Try to attach immediately
-    attachAddJobHandler();
+    function setupPopoutResize() {
+        if (!popoutResizeHandle) return;
+        var minH = 120;
+        var maxH = Math.max(200, window.innerHeight * 0.9);
 
-    // Also expose for re-attachment when manager interface becomes visible
-    window.ensureAddJobButtonHandler = attachAddJobHandler;
-
-    if (addJobCancel) {
-        addJobCancel.addEventListener('click', function (e) {
+        popoutResizeHandle.addEventListener('mousedown', function (e) {
+            if (!employeePopout.classList.contains('employee-popout--open') || employeePopout.classList.contains('employee-popout--collapsed')) return;
             e.preventDefault();
-            hideAddJobPanel();
+            var startY = e.clientY;
+            var startHeight = popoutHeightPx != null ? popoutHeightPx : Math.min(400, window.innerHeight * 0.5);
+            if (employeePopout.style.height) startHeight = parseInt(employeePopout.style.height, 10) || startHeight;
+            employeePopout.classList.add('employee-popout--resizing');
+
+            function onMove(e) {
+                var dy = startY - e.clientY;
+                var newH = Math.min(maxH, Math.max(minH, startHeight + dy));
+                popoutHeightPx = newH;
+                employeePopout.style.maxHeight = '';
+                employeePopout.style.height = newH + 'px';
+            }
+            function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                employeePopout.classList.remove('employee-popout--resizing');
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
         });
     }
 
-    if (addJobForm) {
-        addJobForm.addEventListener('submit', function (e) {
-            e.preventDefault();
-            var titleInput = document.getElementById('add-job-title');
-            var deptInput = document.getElementById('add-job-department');
-            var locInput = document.getElementById('add-job-location');
-            var descInput = document.getElementById('add-job-description');
-            var linkInput = document.getElementById('add-job-link');
-            var title = titleInput ? titleInput.value.trim() : '';
-            if (!title) {
-                if (addJobMessage) addJobMessage.textContent = 'Please enter at least a job title.';
-                return;
-            }
-            var now = Date.now();
-            var job = {
-                id: 'custom-' + now,
-                title: title,
-                department: deptInput ? deptInput.value.trim() : '',
-                location: locInput ? locInput.value.trim() : '',
-                description: descInput ? descInput.value.trim() : '',
-                sourceUrl: linkInput ? linkInput.value.trim() : ''
-            };
-            var jobs = loadCustomJobs();
-            jobs.push(job);
-            saveCustomJobs(jobs);
-            if (addJobMessage) addJobMessage.textContent = 'Job added. It will appear in your list below.';
-            hideAddJobPanel();
-            loadManagerJobs();
+    if (compareBtn) compareBtn.addEventListener('click', startCompareMode);
+    if (backSingleBtn) backSingleBtn.addEventListener('click', function () {
+        var name = compareNameA ? compareNameA.textContent : '';
+        var content = compareContentA ? compareContentA.textContent : '';
+        showSingleView();
+        employeePopoutTitle.textContent = 'Match explanation: ' + name;
+        employeePopoutContent.textContent = content;
+    });
+    setupPopoutResize();
+
+    if (employeePopoutClose) employeePopoutClose.addEventListener('click', closeEmployeePopout);
+    if (popoutDragBtn) {
+        popoutDragBtn.addEventListener('click', function () {
+            if (!employeePopout.classList.contains('employee-popout--open')) return;
+            var collapsed = employeePopout.classList.toggle('employee-popout--collapsed');
+            popoutDragBtn.textContent = collapsed ? '▲' : '▼';
+            if (!collapsed) applyPopoutHeight();
         });
     }
 }
