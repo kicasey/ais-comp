@@ -3,70 +3,70 @@
   "logins": [
     {
       "userId": "emp-1",
-      "email": "jchen@crimson.ua.edu",
+      "email": "jchen@ey.com",
       "password": "Test123!",
       "role": "employee",
       "displayName": "James Chen"
     },
     {
       "userId": "emp-2",
-      "email": "smartinez@crimson.ua.edu",
+      "email": "smartinez@ey.com",
       "password": "Test123!",
       "role": "employee",
       "displayName": "Sarah Martinez"
     },
     {
       "userId": "emp-3",
-      "email": "mjohnson@crimson.ua.edu",
+      "email": "mjohnson@ey.com",
       "password": "Test123!",
       "role": "employee",
       "displayName": "Marcus Johnson"
     },
     {
       "userId": "emp-4",
-      "email": "enguyen@crimson.ua.edu",
+      "email": "enguyen@ey.com",
       "password": "Test123!",
       "role": "employee",
       "displayName": "Emily Nguyen"
     },
     {
       "userId": "emp-5",
-      "email": "dpark@crimson.ua.edu",
+      "email": "dpark@ey.com",
       "password": "Test123!",
       "role": "employee",
       "displayName": "David Park"
     },
     {
       "userId": "emp-6",
-      "email": "athompson@crimson.ua.edu",
+      "email": "athompson@ey.com",
       "password": "Test123!",
       "role": "employee",
       "displayName": "Alexandra Thompson"
     },
     {
       "userId": "emp-7",
-      "email": "mrodriguez@crimson.ua.edu",
+      "email": "mrodriguez@ey.com",
       "password": "Test123!",
       "role": "employee",
       "displayName": "Michael Rodriguez"
     },
     {
       "userId": "emp-8",
-      "email": "jwilliams@crimson.ua.edu",
+      "email": "jwilliams@ey.com",
       "password": "Test123!",
       "role": "employee",
       "displayName": "Jessica Williams"
     },
     {
       "userId": "emp-9",
-      "email": "rkim@crimson.ua.edu",
+      "email": "rkim@ey.com",
       "password": "Test123!",
       "role": "employee",
       "displayName": "Robert Kim"
     },
     {
       "userId": "emp-10",
-      "email": "rfoster@crimson.ua.edu",
+      "email": "rfoster@ey.com",
       "password": "Test123!",
       "role": "employee",
       "displayName": "Rachel Foster"

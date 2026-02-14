@@ -20,16 +20,16 @@ All employees use password **`Test123!`**:
 
 | Email | Name |
 |-------|------|
-| jchen@crimson.ua.edu | James Chen |
-| smartinez@crimson.ua.edu | Sarah Martinez |
-| mjohnson@crimson.ua.edu | Marcus Johnson |
-| enguyen@crimson.ua.edu | Emily Nguyen |
-| dpark@crimson.ua.edu | David Park |
-| athompson@crimson.ua.edu | Alexandra Thompson |
-| mrodriguez@crimson.ua.edu | Michael Rodriguez |
-| jwilliams@crimson.ua.edu | Jessica Williams |
-| rkim@crimson.ua.edu | Robert Kim |
-| rfoster@crimson.ua.edu | Rachel Foster |
+| jchen@ey.com | James Chen |
+| smartinez@ey.com | Sarah Martinez |
+| mjohnson@ey.com | Marcus Johnson |
+| enguyen@ey.com | Emily Nguyen |
+| dpark@ey.com | David Park |
+| athompson@ey.com | Alexandra Thompson |
+| mrodriguez@ey.com | Michael Rodriguez |
+| jwilliams@ey.com | Jessica Williams |
+| rkim@ey.com | Robert Kim |
+| rfoster@ey.com | Rachel Foster |
 
 **Do not use these passwords in production.**
 
