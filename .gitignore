@@ -346,3 +346,5 @@ FodyWeavers.xsd
 
 # Docker image tarballs
 *.tar.gz
+resume-api.tar
+resume--api.tar
