@@ -302,7 +302,7 @@ function setupAuth() {
     }
 
     var logoutBtn = document.getElementById('btn-logout');
-    if (logoutBtn) logoutBtn.addEventListener('click', function () { clearChatDisplay(); setStoredAuth(null); });
+    if (logoutBtn) logoutBtn.addEventListener('click', function () { clearChatDisplay(); hideUploadMessage(); hideLastUpload(); setStoredAuth(null); });
 
     var btnLoginApp = document.getElementById('btn-login-app');
     if (btnLoginApp) btnLoginApp.addEventListener('click', function () {
@@ -468,7 +468,12 @@ function showUploadMessage(message, type) {
 
 function hideUploadMessage() {
     var el = document.getElementById('upload-message');
-    if (el) el.style.display = 'none';
+    if (el) { el.style.display = 'none'; el.textContent = ''; }
+}
+
+function hideLastUpload() {
+    var box = document.getElementById('last-upload-box');
+    if (box) box.style.display = 'none';
 }
 
 // ----- Chat: preset buttons -----
